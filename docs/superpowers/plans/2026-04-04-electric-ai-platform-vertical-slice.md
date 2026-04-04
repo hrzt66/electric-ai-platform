@@ -253,6 +253,26 @@ param(
   [string]$ComposeFile = "deploy/docker-compose.dev.yml"
 )
 
+function Resolve-RepoRoot {
+  return (Resolve-Path (Join-Path $PSScriptRoot "..")).ProviderPath
+}
+
+function Get-ComposeProjectName {
+  param([string]$RepoRoot)
+
+  $normalizedRoot = $RepoRoot.TrimEnd('\', '/').Replace('\', '/').ToLowerInvariant()
+  $hash = [System.BitConverter]::ToString(
+    ([System.Security.Cryptography.SHA256]::Create()).ComputeHash(
+      [System.Text.Encoding]::UTF8.GetBytes($normalizedRoot)
+    )
+  ).Replace("-", "").ToLowerInvariant()
+  return "electric-ai-$($hash.Substring(0, 12))"
+}
+
+$repoRoot = Resolve-RepoRoot
+$composeProjectName = Get-ComposeProjectName -RepoRoot $repoRoot
+$composeFilePath = (Resolve-Path (Join-Path $repoRoot $ComposeFile)).ProviderPath
+
 $tables = @(
   "auth_users",
   "model_registry",
@@ -262,7 +282,7 @@ $tables = @(
 )
 
 foreach ($table in $tables) {
-  $result = docker compose -f $ComposeFile exec -T mysql mysql -uroot -proot electric_ai -Nse "SHOW TABLES LIKE '$table';"
+  $result = docker compose -p $composeProjectName -f $composeFilePath exec -T mysql mysql -uroot -proot electric_ai -Nse "SHOW TABLES LIKE '$table';"
   if ($result -ne $table) {
     Write-Error "Missing table: $table"
     exit 1
@@ -410,13 +430,19 @@ VALUES
 `scripts/dev-up.ps1`
 
 ```powershell
-docker compose -f deploy/docker-compose.dev.yml up -d mysql redis
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).ProviderPath
+$composeFilePath = (Resolve-Path (Join-Path $repoRoot "deploy/docker-compose.dev.yml")).ProviderPath
+$composeProjectName = Get-ComposeProjectName -RepoRoot $repoRoot
+docker compose -p $composeProjectName -f $composeFilePath up -d mysql redis
 ```
 
 `scripts/dev-down.ps1`
 
 ```powershell
-docker compose -f deploy/docker-compose.dev.yml down -v
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).ProviderPath
+$composeFilePath = (Resolve-Path (Join-Path $repoRoot "deploy/docker-compose.dev.yml")).ProviderPath
+$composeProjectName = Get-ComposeProjectName -RepoRoot $repoRoot
+docker compose -p $composeProjectName -f $composeFilePath down -v
 ```
 
 - [ ] **Step 4: Recreate the infra and verify the schema**

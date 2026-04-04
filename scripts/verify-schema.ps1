@@ -7,10 +7,14 @@ $ErrorActionPreference = "Stop"
 
 $ExpectedAdminHash = '$2b$10$ydMkvQ83zoqHxjJmCcviaupmIqse4rfj3k2eujOWeQgitZoSil05a'
 
+function Resolve-RepoRoot {
+  return (Resolve-Path (Join-Path $PSScriptRoot "..")).ProviderPath
+}
+
 function Resolve-ComposeFilePath {
   param([string]$ComposeFile)
 
-  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).ProviderPath
+  $repoRoot = Resolve-RepoRoot
   $candidatePath = if ([System.IO.Path]::IsPathRooted($ComposeFile)) {
     $ComposeFile
   } else {
@@ -24,13 +28,29 @@ function Resolve-ComposeFilePath {
   return (Resolve-Path -LiteralPath $candidatePath).ProviderPath
 }
 
+function Get-ComposeProjectName {
+  param([string]$RepoRoot)
+
+  $normalizedRoot = $RepoRoot.TrimEnd('\', '/').Replace('\', '/').ToLowerInvariant()
+  $sha256 = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $hashBytes = $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($normalizedRoot))
+  } finally {
+    $sha256.Dispose()
+  }
+
+  $hash = [System.BitConverter]::ToString($hashBytes).Replace("-", "").ToLowerInvariant()
+  return "electric-ai-$($hash.Substring(0, 12))"
+}
+
 function Invoke-ComposeQuery {
   param(
+    [string]$ProjectName,
     [string]$ComposeFilePath,
     [string]$Query
   )
 
-  $result = & docker compose -f $ComposeFilePath exec -T -e MYSQL_PWD=root mysql mysql -uroot electric_ai -Nse $Query
+  $result = & docker compose -p $ProjectName -f $ComposeFilePath exec -T -e MYSQL_PWD=root mysql mysql -uroot electric_ai -Nse $Query
   if ($LASTEXITCODE -ne 0) {
     throw "MySQL query failed: $Query"
   }
@@ -51,7 +71,9 @@ function Assert-Equals {
 }
 
 try {
+  $repoRoot = Resolve-RepoRoot
   $composeFilePath = Resolve-ComposeFilePath -ComposeFile $ComposeFile
+  $composeProjectName = Get-ComposeProjectName -RepoRoot $repoRoot
 
   $tables = @(
     "auth_users",
@@ -65,7 +87,7 @@ try {
   )
 
   foreach ($table in $tables) {
-    $tableCount = Invoke-ComposeQuery -ComposeFilePath $composeFilePath -Query "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'electric_ai' AND TABLE_NAME = '$table';"
+    $tableCount = Invoke-ComposeQuery -ProjectName $composeProjectName -ComposeFilePath $composeFilePath -Query "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'electric_ai' AND TABLE_NAME = '$table';"
     Assert-Equals -Actual $tableCount -Expected "1" -Description "Table check for $table"
   }
 
@@ -93,7 +115,7 @@ try {
   )
 
   foreach ($check in $seedChecks) {
-    $result = Invoke-ComposeQuery -ComposeFilePath $composeFilePath -Query $check.Query
+    $result = Invoke-ComposeQuery -ProjectName $composeProjectName -ComposeFilePath $composeFilePath -Query $check.Query
     Assert-Equals -Actual $result -Expected $check.Expected -Description $check.Description
   }
 
@@ -131,7 +153,7 @@ try {
   )
 
   foreach ($check in $constraintChecks) {
-    $result = Invoke-ComposeQuery -ComposeFilePath $composeFilePath -Query $check.Query
+    $result = Invoke-ComposeQuery -ProjectName $composeProjectName -ComposeFilePath $composeFilePath -Query $check.Query
     Assert-Equals -Actual $result -Expected $check.Expected -Description $check.Description
   }
 

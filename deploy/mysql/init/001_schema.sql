@@ -48,7 +48,9 @@ CREATE TABLE asset_images (
     model_name VARCHAR(255) NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'generated',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_asset_images_job_id (job_id),
+    CONSTRAINT fk_asset_images_job FOREIGN KEY (job_id) REFERENCES task_jobs(id)
 );
 
 CREATE TABLE asset_image_prompts (
@@ -80,5 +82,7 @@ CREATE TABLE audit_task_events (
     job_id BIGINT NOT NULL,
     event_type VARCHAR(64) NOT NULL,
     message VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_audit_task_events_job_id (job_id),
+    CONSTRAINT fk_audit_task_events_job FOREIGN KEY (job_id) REFERENCES task_jobs(id)
 );

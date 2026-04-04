@@ -9,7 +9,10 @@ func TestLoadBuildsConfigFromEnv(t *testing.T) {
 	t.Setenv("REDIS_ADDR", "localhost:6379")
 	t.Setenv("JWT_SECRET", "electric-ai-secret")
 
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
 	if cfg.AppName != "auth-service" {
 		t.Fatalf("expected auth-service, got %s", cfg.AppName)
@@ -19,5 +22,14 @@ func TestLoadBuildsConfigFromEnv(t *testing.T) {
 	}
 	if cfg.JWTSecret != "electric-ai-secret" {
 		t.Fatalf("expected jwt secret to be loaded")
+	}
+}
+
+func TestLoadReturnsErrorWhenJWTSecretMissing(t *testing.T) {
+	t.Setenv("JWT_SECRET", "")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("expected error when JWT_SECRET is missing")
 	}
 }

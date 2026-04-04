@@ -1899,7 +1899,7 @@ services:
 
 - [ ] **Step 4: Start the stack and run the smoke test**
 
-Run: `docker compose -f deploy/docker-compose.dev.yml up --build -d`
+Run: `docker compose -p <hashed-project-name> -f deploy/docker-compose.dev.yml up --build -d`
 
 Run: `powershell -File scripts/smoke.ps1`
 

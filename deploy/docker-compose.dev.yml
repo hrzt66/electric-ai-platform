@@ -6,7 +6,7 @@ services:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: electric_ai
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3307}:3306"
     volumes:
       - ./mysql/init:/docker-entrypoint-initdb.d
 
@@ -14,4 +14,4 @@ services:
     image: redis:7.2
     container_name: electric-ai-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6380}:6379"

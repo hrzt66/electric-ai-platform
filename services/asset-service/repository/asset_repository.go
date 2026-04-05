@@ -8,16 +8,19 @@ import (
 	"electric-ai/services/asset-service/model"
 )
 
+// AssetRepository 封装资产、提示词和评分三张表的读写逻辑。
 type AssetRepository struct {
 	db         *sql.DB
 	schemaOnce sync.Once
 	schemaErr  error
 }
 
+// NewAssetRepository 创建资产仓储实例。
 func NewAssetRepository(db *sql.DB) *AssetRepository {
 	return &AssetRepository{db: db}
 }
 
+// ensureSchema 在首次使用时补齐资产相关表结构。
 func (r *AssetRepository) ensureSchema(ctx context.Context) error {
 	r.schemaOnce.Do(func() {
 		const imageTable = `
@@ -65,6 +68,7 @@ CREATE TABLE IF NOT EXISTS asset_image_scores (
 	return r.schemaErr
 }
 
+// SaveResults 把一批生成结果写入资产、提示词和评分表，并返回写入后的历史记录。
 func (r *AssetRepository) SaveResults(ctx context.Context, jobID int64, items []model.PersistAssetResult) ([]model.HistoryItem, error) {
 	if err := r.ensureSchema(ctx); err != nil {
 		return nil, err
@@ -149,6 +153,7 @@ VALUES (?, ?, ?, ?, ?, ?)
 	return results, nil
 }
 
+// ListHistory 联表查询历史中心所需的聚合结果。
 func (r *AssetRepository) ListHistory(ctx context.Context) ([]model.HistoryItem, error) {
 	if err := r.ensureSchema(ctx); err != nil {
 		return nil, err
@@ -199,6 +204,7 @@ LIMIT 100
 	return items, rows.Err()
 }
 
+// GetDetail 查询单条资产记录的完整详情。
 func (r *AssetRepository) GetDetail(ctx context.Context, id int64) (model.AssetDetail, error) {
 	if err := r.ensureSchema(ctx); err != nil {
 		return model.AssetDetail{}, err

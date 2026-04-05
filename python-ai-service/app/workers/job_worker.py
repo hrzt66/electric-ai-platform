@@ -29,6 +29,7 @@ class JobWorker:
         pending_claim_count: int = 10,
         sleep_fn=time.sleep,
     ) -> None:
+        """初始化消费组参数、批量大小、挂起消息回收策略和睡眠函数。"""
         self._pipeline = pipeline
         self._stream_name = stream_name
         self._group_name = group_name
@@ -61,6 +62,7 @@ class JobWorker:
         return self._pipeline.run(job)
 
     def process_stream_message(self, fields: dict[str, Any]) -> list[dict]:
+        """把 Redis Stream 原始字段解析成 payload，再交给任务流水线执行。"""
         decoded = self._normalize_fields(fields)
         payload = decoded.get("payload")
         if payload is None:
@@ -102,6 +104,7 @@ class JobWorker:
         return processed
 
     def _reclaim_stale_messages(self, redis_client, *, consumer_name: str):
+        """领回长时间未 ACK 的挂起消息，避免任务卡死在旧消费者上。"""
         if not hasattr(redis_client, "xautoclaim"):
             return []
 
@@ -118,6 +121,7 @@ class JobWorker:
         return messages or []
 
     def consume_forever(self, redis_client, *, consumer_name: str) -> None:
+        """进入常驻消费循环，持续从 Redis Stream 拉取或回收任务。"""
         self.ensure_consumer_group(redis_client)
         logger.info(
             "worker started stream=%s group=%s consumer=%s pending_idle_ms=%s",
@@ -135,10 +139,12 @@ class JobWorker:
                 self._sleep_fn(1)
 
     def _normalize_fields(self, fields: dict[Any, Any]) -> dict[str, Any]:
+        """把 Redis 返回的 bytes / mixed dict 统一标准化为字符串键值。"""
         return {str(self._decode_value(key)): self._decode_value(value) for key, value in fields.items()}
 
     @staticmethod
     def _decode_value(value: Any) -> Any:
+        """把 Redis bytes 值解码成 UTF-8 字符串，其余类型保持原样。"""
         if isinstance(value, bytes):
             return value.decode("utf-8")
         return value

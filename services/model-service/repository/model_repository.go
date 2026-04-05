@@ -11,16 +11,19 @@ import (
 	"electric-ai/services/model-service/model"
 )
 
+// ModelRepository 负责模型注册表的迁移、种子初始化和查询。
 type ModelRepository struct {
 	db         *sql.DB
 	schemaOnce sync.Once
 	schemaErr  error
 }
 
+// NewModelRepository 创建模型仓储实例。
 func NewModelRepository(db *sql.DB) *ModelRepository {
 	return &ModelRepository{db: db}
 }
 
+// modelSchemaStatements 返回模型注册表所需的建表与升级 SQL。
 func modelSchemaStatements() []string {
 	return []string{
 		`
@@ -57,6 +60,7 @@ INNER JOIN model_registry AS keeper
 	}
 }
 
+// ensureSchema 确保模型表结构和基础种子数据存在。
 func (r *ModelRepository) ensureSchema(ctx context.Context) error {
 	r.schemaOnce.Do(func() {
 		for _, statement := range modelSchemaStatements() {
@@ -137,6 +141,7 @@ ON DUPLICATE KEY UPDATE
 	return r.schemaErr
 }
 
+// isIgnorableMigrationError 忽略重复列与重复索引带来的幂等迁移错误。
 func isIgnorableMigrationError(err error) bool {
 	var mysqlErr *mysqlDriver.MySQLError
 	if !errors.As(err, &mysqlErr) {
@@ -145,6 +150,7 @@ func isIgnorableMigrationError(err error) bool {
 	return mysqlErr.Number == 1060 || mysqlErr.Number == 1061
 }
 
+// ListCatalog 返回模型中心的完整目录列表。
 func (r *ModelRepository) ListCatalog(ctx context.Context) ([]model.RegistryModel, error) {
 	if err := r.ensureSchema(ctx); err != nil {
 		return nil, err
@@ -189,6 +195,7 @@ ORDER BY id ASC
 	return items, nil
 }
 
+// GetByName 根据模型名查询单条注册表记录。
 func (r *ModelRepository) GetByName(ctx context.Context, modelName string) (model.RegistryModel, error) {
 	if err := r.ensureSchema(ctx); err != nil {
 		return model.RegistryModel{}, err

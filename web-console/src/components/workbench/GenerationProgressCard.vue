@@ -9,7 +9,9 @@ const props = defineProps<{
   auditEvents: AuditEvent[]
 }>()
 
+// 进度对象把任务状态和审计事件汇总成可直接渲染的结构。
 const progress = computed(() => buildGenerationProgress(props.task, props.auditEvents))
+// 最近事件只展示少量条目，避免进度卡片内容过长。
 const recentEvents = computed(() => getRecentAuditEvents(props.auditEvents, 2))
 </script>
 

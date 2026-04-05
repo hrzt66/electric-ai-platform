@@ -149,6 +149,207 @@ flowchart LR
 
 这意味着在当前平台里，“看起来像一张好图”并不够，是否真正贴合提示词会对总分产生更大影响。
 
+### 3.1 评分流程图
+
+```mermaid
+flowchart TD
+    A["提示词 prompt"] --> B["生成图片 image"]
+    B --> C1["CLIP-IQA<br/>visual_fidelity"]
+    B --> C2["CLIP-IQA<br/>physical_plausibility"]
+    A --> D["ImageReward"]
+    B --> D
+    B --> E["Aesthetic Predictor"]
+    C1 --> F["视觉保真分"]
+    C2 --> G["物理合理分"]
+    D --> H["文本一致分"]
+    E --> I["构图美学分"]
+    F --> J["ScoringService 校准"]
+    G --> J
+    H --> J
+    I --> J
+    J --> K["加权汇总 total_score"]
+```
+
+这张图强调了当前平台的一个核心事实：
+
+- 评分不是单模型单输出。
+- 而是由多种评分模型分别负责不同维度。
+- 最终由 `ScoringService` 做统一校准与加权汇总。
+
+### 3.2 模型选型决策图
+
+```mermaid
+flowchart TD
+    Start["开始生成任务"] --> Q1{"目标是什么？"}
+    Q1 -->|"联调、批量测试、快速跑通"| SD15["优先 sd15-electric"]
+    Q1 -->|"最终展示、复杂提示词、高语义要求"| Q2{"本机显存和时间是否充足？"}
+    Q2 -->|"是"| Uni["优先 unipic2-kontext"]
+    Q2 -->|"否"| SD15
+    SD15 --> Q3{"评分怎么看？"}
+    Uni --> Q3
+    Q3 -->|"先判断贴题"| Text["先看 text_consistency"]
+    Text --> Phys["再看 physical_plausibility"]
+    Phys --> Visual["再看 visual_fidelity"]
+    Visual --> Aes["最后看 composition_aesthetics"]
+```
+
+这张决策图背后的推荐逻辑是：
+
+- 先决定“生成阶段”用哪个模型。
+- 再决定“结果阶段”应该优先看哪些评分。
+- 对工业电力题材来说，通常是“贴题”和“结构合理”优先于“单纯好看”。
+
+### 3.3 关键数学函数说明
+
+当前平台虽然最终展示的是 `0-100` 分数，但底层并不是简单线性打分，而是用了一组归一化、映射和校准函数。
+
+#### 3.3.1 ImageReward 的 sigmoid 归一化
+
+`ImageReward` 输出的是原始分值 `r`，当前平台会把它映射到 `0-100`：
+
+```text
+S_image_reward(r) = clip(100 / (1 + e^(-r)), 0, 100)
+```
+
+这里的意义是：
+
+- 当原始分值较低时，分数增长较慢。
+- 当原始分值接近 0 附近时，分数变化更敏感。
+- 当原始分值很高时，分数会逐渐饱和，不会无限增大。
+
+这就是典型的 sigmoid 压缩思想，它能把不受限原始分数变成更容易展示和比较的 `0-100` 区间。
+
+#### 3.3.2 CLIP-IQA 的正负概率归一化
+
+当前项目中的 `CLIP-IQA` 会为一张图构造：
+
+- 一组正向描述
+- 一组负向描述
+
+然后计算：
+
+```text
+p_pos = mean(positive_probs)
+p_neg = mean(negative_probs)
+S_clip = 100 * p_pos / (p_pos + p_neg)
+```
+
+它的直觉很简单：
+
+- 如果图片更像“正向工业描述”，分数就更高。
+- 如果图片更像“负向失真描述”，分数就更低。
+
+这也是为什么 `CLIP-IQA` 能被你这个项目改造成：
+
+- 视觉保真评分器
+- 物理合理评分器
+
+关键不在于换模型，而在于换正负提示词集合。
+
+#### 3.3.3 Aesthetic Predictor 的特征归一化
+
+`Aesthetic Predictor` 在送入 MLP 之前，会先对图像特征做 L2 归一化：
+
+```text
+z_hat = z / ||z||2
+```
+
+这里：
+
+- `z` 是 CLIP 提取出的图像特征向量
+- `||z||2` 是它的 L2 范数
+
+这样做的目的是：
+
+- 让特征更多体现“方向信息”而不是绝对长度
+- 降低不同图片特征尺度不一致带来的影响
+- 让后面的美学回归器更稳定
+
+#### 3.3.4 Aesthetic Predictor 的分段映射
+
+`Aesthetic Predictor` 的原始分不是直接等于最终 `0-100`，而是通过分段函数映射：
+
+```text
+当 raw < 5:
+S_aesthetic = 10 + (raw - 1) * (50 / 4)
+
+当 raw >= 5:
+S_aesthetic = 60 + (raw - 5) * (40 / 3.5)
+```
+
+最后再限制到 `0-100`：
+
+```text
+S_aesthetic = clip(S_aesthetic, 0, 100)
+```
+
+这样做的意义是：
+
+- 让低分区和高分区有不同斜率
+- 保留美学分的区分度
+- 避免原始回归输出直接映射后过于拥挤在中间区间
+
+#### 3.3.5 总分加权函数
+
+四个维度的分数校准后，会按权重计算总分：
+
+```text
+total_score =
+  0.21 * visual_fidelity +
+  0.37 * text_consistency +
+  0.24 * physical_plausibility +
+  0.18 * composition_aesthetics
+```
+
+这意味着总分不是“简单平均”，而是明确偏向文本一致性。
+
+#### 3.3.6 高分压缩函数
+
+当前平台为了避免某些维度长期虚高，引入了高分段压缩函数：
+
+```text
+若 s <= knee:
+f(s) = s
+
+若 s > knee:
+f(s) = knee + (s - knee) * scale
+```
+
+其中：
+
+- `knee` 是拐点
+- `scale` 是压缩比例，通常小于 `1`
+
+它的直觉是：
+
+- 拐点之前保持原始分数
+- 拐点之后增幅变慢
+
+所以它特别适合处理“高分段过于乐观”的模型输出。
+
+#### 3.3.7 低分抬升函数
+
+针对文本一致性偏低的问题，当前平台还引入了低分抬升函数：
+
+```text
+若 s >= target:
+g(s) = s
+
+若 s < target:
+g(s) = s + (target - s) * gain
+```
+
+其中：
+
+- `target` 是希望靠近的目标分位
+- `gain` 是抬升比例
+
+它的作用是：
+
+- 不改动已经足够高的分数
+- 只适度抬升过低分数
+- 缓解原始模型长期偏低的系统性偏差
+
 ## 4. 评分模型详细介绍
 
 ### 4.1 `ImageReward`

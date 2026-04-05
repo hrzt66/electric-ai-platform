@@ -13,13 +13,17 @@ logger = logging.getLogger("electric_ai.runtime.unipic2")
 
 
 class UniPic2Runtime:
+    """封装 UniPic2 Kontext 的模型装配、执行策略与推理过程。"""
+
     def __init__(self, model_dir: Path, output_dir: Path, pipeline=None, offload_mode: str = "model") -> None:
+        """初始化模型目录、输出目录和 CPU offload 策略。"""
         self.model_dir = Path(model_dir)
         self.output_dir = Path(output_dir)
         self._pipeline = pipeline
         self.offload_mode = offload_mode.strip().lower()
 
     def prepare(self, job=None) -> None:
+        """准备模型与输出目录，并记录当前运行策略到日志。"""
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         logger.info(
@@ -30,6 +34,7 @@ class UniPic2Runtime:
         )
 
     def _build_default_pipeline(self):
+        """按 UniPic2 所需组件逐个加载 transformer、VAE 和多路文本编码器。"""
         import torch
         from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler
         from transformers import (
@@ -118,6 +123,7 @@ class UniPic2Runtime:
         return self._apply_execution_strategy(pipe, cuda_available=bool(torch.cuda.is_available()))
 
     def _apply_execution_strategy(self, pipe, *, cuda_available: bool):
+        """根据 offload_mode 选择 CPU/GPU 执行策略，平衡显存与速度。"""
         logger.info(
             "applying unipic2 execution strategy cuda=%s offload_mode=%s",
             cuda_available,
@@ -146,6 +152,7 @@ class UniPic2Runtime:
         return pipe.to("cuda")
 
     def _resolve_pipeline(self):
+        """懒加载 UniPic2 pipeline，避免空闲时占用过多资源。"""
         if self._pipeline is None:
             self._pipeline = self._build_default_pipeline()
         return self._pipeline
@@ -164,6 +171,7 @@ class UniPic2Runtime:
         num_images: int,
         model_name: str,
     ) -> list[dict]:
+        """执行 UniPic2 生成，并把每张图片保存到统一输出目录。"""
         self.prepare()
         pipeline = self._resolve_pipeline()
         generator = self._build_generator(seed)
@@ -206,6 +214,7 @@ class UniPic2Runtime:
         return saved
 
     def _build_generator(self, seed: int):
+        """用种子创建 torch generator，保证本模型的结果可复现。"""
         try:
             import torch
         except ImportError:
@@ -216,6 +225,7 @@ class UniPic2Runtime:
         return generator
 
     def unload(self) -> None:
+        """释放 UniPic2 pipeline 与 CUDA 缓存，避免下一个任务被显存占满。"""
         if self._pipeline is not None:
             logger.info("unloading unipic2 runtime pipeline")
             del self._pipeline

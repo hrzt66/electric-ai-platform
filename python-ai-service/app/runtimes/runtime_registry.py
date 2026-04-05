@@ -26,6 +26,7 @@ class RuntimeRegistry:
         settings: Settings | None = None,
         manifest_provider: Callable[[Settings | None], dict[str, dict[str, Any]]] = get_model_manifest,
     ) -> None:
+        """初始化模型清单提供者、生成模型工厂和运行时缓存。"""
         self._settings = settings or get_settings()
         self._manifest_provider = manifest_provider
         # 生成模型通过工厂注册，后续新增模型时只需要在这里挂接即可。
@@ -37,6 +38,7 @@ class RuntimeRegistry:
         self._active_generation_model_name: str | None = None
 
     def get_generation_runtime(self, model_name: str):
+        """获取指定生成模型的运行时，并在必要时释放前一个活跃模型。"""
         # 当前策略是“同一时刻只保留一个活跃生成模型”，以便在单卡环境中主动回收显存。
         if model_name not in self._generation_runtime_factories:
             raise KeyError(f"unsupported generation runtime: {model_name}")
@@ -65,6 +67,7 @@ class RuntimeRegistry:
         self._release_generation_runtime(target)
 
     def list_models(self) -> dict[str, list[dict[str, Any]]]:
+        """返回模型中心可直接展示的模型条目列表与本地可用状态。"""
         # 模型中心既要展示注册表条目，也要反馈本地目录是否真的已经下载完成。
         manifest = self._manifest_provider(self._settings)
         items: list[dict[str, Any]] = []
@@ -83,6 +86,7 @@ class RuntimeRegistry:
         return {"items": items}
 
     def build_status(self) -> dict[str, Any]:
+        """构建运行时探针报告，用于健康检查和模型中心状态页。"""
         paths = RuntimePaths(self._settings.runtime_root)
         report = paths.build_probe_report()
         report["packages"] = {
@@ -98,12 +102,14 @@ class RuntimeRegistry:
         return report
 
     def _build_sd15_runtime(self) -> SD15Runtime:
+        """构造 SD1.5 运行时实例。"""
         return SD15Runtime(
             model_dir=self._settings.generation_model_dir / "sd15-electric",
             output_dir=self._settings.output_image_dir,
         )
 
     def _build_unipic2_runtime(self) -> UniPic2Runtime:
+        """构造 UniPic2 运行时实例，并注入当前 offload 配置。"""
         return UniPic2Runtime(
             model_dir=self._settings.generation_model_dir / "unipic2-kontext",
             output_dir=self._settings.output_image_dir,
@@ -122,9 +128,11 @@ class RuntimeRegistry:
 
     @staticmethod
     def _package_available(name: str) -> bool:
+        """检查某个 Python 包是否已安装，用于运行时探针展示。"""
         return importlib.util.find_spec(name) is not None
 
     def _detect_cuda(self) -> bool | None:
+        """探测当前 Python 环境是否真正具备可用 CUDA。"""
         if not self._package_available("torch"):
             return None
 
@@ -133,6 +141,7 @@ class RuntimeRegistry:
         return bool(torch.cuda.is_available())
 
     def _resolve_status(self, *, name: str, target: str, has_files: bool) -> str:
+        """根据本地目录内容和模型目标类型推导最终展示状态。"""
         if has_files:
             return "available"
         if target == "generation" and name not in self._generation_runtime_factories:

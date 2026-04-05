@@ -21,6 +21,7 @@ import type {
 const CACHE_TTL_MS = 5_000
 
 function isCacheFresh(timestamp: number, ttl = CACHE_TTL_MS) {
+  // 判断缓存是否仍在有效期内，避免页面反复切换时重复打网关。
   return timestamp > 0 && Date.now() - timestamp < ttl
 }
 
@@ -30,6 +31,7 @@ function ensureArray<T>(value: T[] | null | undefined): T[] {
 }
 
 function extractErrorMessage(error: unknown, fallback: string) {
+  // 优先读取后端 envelope.message，其次退回 Error.message，再退回兜底文案。
   if (typeof error === 'object' && error !== null) {
     const responseMessage = (error as { response?: { data?: { message?: unknown } } }).response?.data?.message
     if (typeof responseMessage === 'string' && responseMessage.trim()) {
@@ -104,6 +106,7 @@ export const usePlatformStore = defineStore('platform', {
   },
   actions: {
     async submitGenerateJob(payload: GenerateTaskRequest) {
+      // 提交任务后立即把 currentTask 切到新任务，保证工作台第一时间进入轮询状态。
       this.submitting = true
       try {
         const task = await createGenerateTask(payload)
@@ -158,6 +161,7 @@ export const usePlatformStore = defineStore('platform', {
     },
 
     async fetchModels(options?: { force?: boolean }) {
+      // 拉取模型中心数据，并利用短 TTL 缓存降低页面切换时的请求量。
       const force = options?.force ?? false
 
       if (!force && this.modelsRequest) {
@@ -193,6 +197,7 @@ export const usePlatformStore = defineStore('platform', {
     },
 
     async fetchHistory(options?: { force?: boolean }) {
+      // 历史记录用于历史中心和当前任务结果预览，两处共用同一份缓存。
       const force = options?.force ?? false
 
       if (!force && this.historyRequest) {
@@ -270,11 +275,13 @@ export const usePlatformStore = defineStore('platform', {
     },
 
     async fetchTaskAudit(taskId: number) {
+      // 独立刷新任务审计，用于历史详情抽屉和审计页复用。
       this.currentTaskAudit = ensureArray(await listTaskAuditEvents(taskId))
       return this.currentTaskAudit
     },
 
     async fetchAssetDetail(assetId: number) {
+      // 查询当前选中资产的详情，用于历史中心右侧抽屉。
       this.selectedAssetDetail = await getAssetDetail(assetId)
       return this.selectedAssetDetail
     },

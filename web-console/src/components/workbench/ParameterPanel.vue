@@ -14,6 +14,7 @@ const emit = defineEmits<{
   fillDefaults: [model: ModelRecord]
 }>()
 
+// 当前选中模型的说明会在面板顶部展示，帮助用户理解不同模型的定位。
 const selectedModel = computed(() => props.models.find((item) => item.model_name === props.form.model_name) ?? null)
 </script>
 

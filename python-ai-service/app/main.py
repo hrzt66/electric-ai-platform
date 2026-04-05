@@ -18,18 +18,22 @@ def create_app(*, runtime_registry=None, generation_service=None, scoring_servic
 
     @app.get("/health")
     def health() -> dict:
+        """返回基础健康状态，供网关和脚本探活使用。"""
         return {"status": "ok"}
 
     @app.get("/runtime/status")
     def runtime_status() -> dict:
+        """返回 Python 运行时探针报告，包括包依赖、CUDA 与模型状态。"""
         return registry.build_status()
 
     @app.get("/runtime/models")
     def runtime_models() -> dict:
+        """返回模型中心使用的模型清单。"""
         return registry.list_models()
 
     @app.post("/internal/generate")
     def generate(request: GenerateJob) -> dict:
+        """在 API 模式下同步执行生成与评分，并直接返回结果。"""
         # API 模式会直接在请求线程内执行生成和评分，适合 smoke test 与链路联调。
         runtime = registry.get_generation_runtime(request.model_name)
         generated_images = generator.generate(request, runtime)
@@ -47,4 +51,5 @@ def create_app(*, runtime_registry=None, generation_service=None, scoring_servic
     return app
 
 
+# 创建默认 FastAPI 应用实例，供 uvicorn 直接导入启动。
 app = create_app()

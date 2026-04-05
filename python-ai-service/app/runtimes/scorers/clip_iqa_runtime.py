@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""基于 CLIP 的工业图像质量评分运行时，用于视觉保真和物理合理评估。"""
+
 import gc
 from pathlib import Path
 
@@ -38,6 +40,7 @@ class ClipIQARuntime:
     }
 
     def __init__(self, *, mode: str, device: str | None = None, clip_model_id: str = "openai/clip-vit-large-patch14") -> None:
+        """初始化 CLIP-IQA 运行时的评分模式、设备和模型标识。"""
         self.mode = mode
         self.device = device
         self.clip_model_id = clip_model_id
@@ -45,18 +48,21 @@ class ClipIQARuntime:
         self._clip_processor = None
 
     def normalize_probability_score(self, avg_positive: float, avg_negative: float) -> float:
+        """把正负提示词平均概率折算成 0-100 的二分类相对得分。"""
         total = avg_positive + avg_negative
         if total <= 0:
             return 50.0
         return round((avg_positive / total) * 100.0, 2)
 
     def _resolve_device(self) -> str:
+        """自动确定 CLIP 推理所用设备。"""
         if self.device:
             return self.device
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         return self.device
 
     def _load_models(self) -> None:
+        """懒加载 CLIP 模型与处理器，减少空闲时资源占用。"""
         if self._clip_model is not None and self._clip_processor is not None:
             return
 
@@ -68,6 +74,7 @@ class ClipIQARuntime:
         self._clip_processor = CLIPProcessor.from_pretrained(self.clip_model_id)
 
     def score_image(self, image_path: str, prompt: str = "", mode: str | None = None) -> float:
+        """使用正负工业描述模板对单张图片做相对质量评分。"""
         self._load_models()
         image = Image.open(Path(image_path)).convert("RGB")
 
@@ -88,6 +95,7 @@ class ClipIQARuntime:
         return self.normalize_probability_score(float(positive_probs.mean().item()), float(negative_probs.mean().item()))
 
     def unload(self) -> None:
+        """释放 CLIP 模型与处理器，回收显存。"""
         for attr in ("_clip_model", "_clip_processor"):
             value = getattr(self, attr)
             if value is not None:

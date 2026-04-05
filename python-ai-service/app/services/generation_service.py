@@ -12,7 +12,10 @@ logger = logging.getLogger("electric_ai.runtime.generation")
 
 
 class GenerationService:
+    """生成服务，负责把任务参数整理后交给具体生成模型执行。"""
+
     def generate(self, job, runtime) -> list[dict]:
+        """执行一次生成任务，并把最终使用的种子写回每张结果记录。"""
         # 前端约定 seed=-1 代表“随机种子”，这里在真正调用模型前解析成正整数。
         resolved_seed = self._resolve_seed(job.seed)
         if resolved_seed != job.seed:

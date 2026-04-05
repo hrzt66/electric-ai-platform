@@ -18,6 +18,7 @@ def build_worker(*, pipeline=None, settings: Settings | None = None) -> JobWorke
 
 
 def main() -> int:
+    """创建 Redis 客户端与 Worker，并持续消费生成任务。"""
     settings = get_settings()
     redis_client = redis.from_url(settings.redis_url, decode_responses=True)
     worker = build_worker(settings=settings)
@@ -28,4 +29,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # 允许直接以 `python -m app.worker` 形式启动 Worker 进程。
     raise SystemExit(main())

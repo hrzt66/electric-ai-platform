@@ -11,16 +11,19 @@ import (
 	"electric-ai/services/audit-service/model"
 )
 
+// AuditRepository 负责审计事件表的迁移和读写。
 type AuditRepository struct {
 	db         *sql.DB
 	schemaOnce sync.Once
 	schemaErr  error
 }
 
+// NewAuditRepository 创建审计仓储实例。
 func NewAuditRepository(db *sql.DB) *AuditRepository {
 	return &AuditRepository{db: db}
 }
 
+// auditSchemaStatements 返回审计表自举 SQL 与兼容升级 SQL。
 func auditSchemaStatements() []string {
 	return []string{
 		`
@@ -39,6 +42,7 @@ CREATE TABLE IF NOT EXISTS audit_task_events (
 	}
 }
 
+// ensureSchema 确保审计表结构只在首次访问时初始化一次。
 func (r *AuditRepository) ensureSchema(ctx context.Context) error {
 	r.schemaOnce.Do(func() {
 		for _, statement := range auditSchemaStatements() {
@@ -54,6 +58,7 @@ func (r *AuditRepository) ensureSchema(ctx context.Context) error {
 	return r.schemaErr
 }
 
+// isIgnorableMigrationError 用于忽略幂等迁移中的“列已存在”错误。
 func isIgnorableMigrationError(err error) bool {
 	var mysqlErr *mysqlDriver.MySQLError
 	if !errors.As(err, &mysqlErr) {
@@ -62,6 +67,7 @@ func isIgnorableMigrationError(err error) bool {
 	return mysqlErr.Number == 1060
 }
 
+// Append 写入一条审计事件。
 func (r *AuditRepository) Append(ctx context.Context, item model.TaskEvent) error {
 	if err := r.ensureSchema(ctx); err != nil {
 		return err
@@ -73,6 +79,7 @@ VALUES (?, ?, ?, ?)
 	return err
 }
 
+// ListByJobID 查询某个任务的全部审计事件，按时间正序返回。
 func (r *AuditRepository) ListByJobID(ctx context.Context, jobID int64) ([]model.TaskEvent, error) {
 	if err := r.ensureSchema(ctx); err != nil {
 		return nil, err

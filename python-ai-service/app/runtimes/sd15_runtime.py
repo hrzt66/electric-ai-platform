@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""SD1.5 生成运行时，负责模型加载、推理出图和资源释放。"""
+
 from dataclasses import asdict
 from pathlib import Path
 import gc
@@ -8,16 +10,21 @@ from app.runtimes.base import GeneratedImageRecord
 
 
 class SD15Runtime:
+    """封装 Stable Diffusion 1.5 在当前平台中的执行方式。"""
+
     def __init__(self, model_dir: Path, output_dir: Path, pipeline=None) -> None:
+        """记录模型目录、输出目录以及可选的外部注入 pipeline。"""
         self.model_dir = Path(model_dir)
         self.output_dir = Path(output_dir)
         self._pipeline = pipeline
 
     def prepare(self, job=None) -> None:
+        """确保模型目录和输出目录存在，供后续推理与图片保存使用。"""
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def _build_default_pipeline(self):
+        """按当前机器环境构建默认 SD1.5 pipeline，并启用基础显存优化。"""
         from diffusers import StableDiffusionPipeline
         import torch
 
@@ -39,6 +46,7 @@ class SD15Runtime:
         return pipe
 
     def _resolve_pipeline(self):
+        """懒加载 pipeline，避免服务启动时就立刻占满显存。"""
         if self._pipeline is None:
             self._pipeline = self._build_default_pipeline()
         return self._pipeline
@@ -57,6 +65,7 @@ class SD15Runtime:
         num_images: int,
         model_name: str,
     ) -> list[dict]:
+        """执行一次真实生成任务，并把结果图片落盘后返回资产记录。"""
         self.prepare()
         pipeline = self._resolve_pipeline()
         generator = self._build_generator(seed)
@@ -89,6 +98,7 @@ class SD15Runtime:
         return saved
 
     def _build_generator(self, seed: int):
+        """根据随机种子构建 torch generator，保证同种子结果可复现。"""
         try:
             import torch
         except ImportError:
@@ -99,6 +109,7 @@ class SD15Runtime:
         return generator
 
     def unload(self) -> None:
+        """释放 pipeline 与 CUDA 缓存，供后续模型切换重新分配显存。"""
         if self._pipeline is not None:
             del self._pipeline
             self._pipeline = None

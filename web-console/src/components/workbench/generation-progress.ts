@@ -23,18 +23,22 @@ const PHASE_LABELS = ['任务受理', '模型准备', '图像生成', '评分归
 const PHASE_PERCENTS = [12, 34, 68, 88, 100] as const
 
 function normalize(value: string) {
+  // 统一大小写和分隔符，方便把 status / stage / event_type 放在一起比较。
   return value.trim().toLowerCase().replace(/[_\s-]+/g, '.')
 }
 
 function includesAny(source: string, tokens: string[]) {
+  // 判断某段状态文本是否命中了任意关键词。
   return tokens.some((token) => source.includes(token))
 }
 
 function sortAuditEvents(events: AuditEvent[]) {
+  // 审计事件按时间倒序排列，便于后续直接取“最近一条事件”。
   return [...events].sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))
 }
 
 function resolvePhaseIndex(task: GenerateTask, auditEvents: AuditEvent[]) {
+  // 综合任务状态和最近审计事件，推断当前进度应该落在哪个阶段。
   const current = normalize(`${task.status}.${task.stage}`)
   const latestEvent = sortAuditEvents(auditEvents)[0]
   const latest = latestEvent ? normalize(latestEvent.event_type) : ''
@@ -60,6 +64,7 @@ function resolvePhaseIndex(task: GenerateTask, auditEvents: AuditEvent[]) {
 }
 
 function buildPhaseState(index: number, activePhaseIndex: number, taskStatus: string): ProgressPhaseState {
+  // 根据当前活跃阶段和失败状态，给每个阶段计算 done/active/pending/failed。
   if (taskStatus === 'failed') {
     if (index < activePhaseIndex) {
       return 'done'
@@ -86,6 +91,7 @@ function buildPhaseState(index: number, activePhaseIndex: number, taskStatus: st
 }
 
 function buildHeadline(taskStatus: string, phaseIndex: number) {
+  // 生成进度卡片顶部的大标题文案。
   if (taskStatus === 'failed') {
     return '任务执行失败'
   }
@@ -110,6 +116,7 @@ function buildHeadline(taskStatus: string, phaseIndex: number) {
 }
 
 function buildDetail(task: GenerateTask, phaseIndex: number) {
+  // 为当前进度阶段生成更具体的解释文案。
   if (task.status === 'failed') {
     return task.error_message || '运行时中断了当前任务，请查看右侧实时状态与审计轨迹。'
   }
@@ -134,6 +141,7 @@ function buildDetail(task: GenerateTask, phaseIndex: number) {
 }
 
 export function formatAuditEventLabel(eventType: string) {
+  // 把后端事件类型翻译成更适合前端展示的短标签。
   const normalized = normalize(eventType)
 
   if (includesAny(normalized, ['score', 'audit'])) {
@@ -159,10 +167,12 @@ export function formatAuditEventLabel(eventType: string) {
 }
 
 export function getRecentAuditEvents(auditEvents: AuditEvent[], count = 3) {
+  // 截取最近几条事件，在进度卡片底部做简洁展示。
   return sortAuditEvents(auditEvents).slice(0, count)
 }
 
 export function buildGenerationProgress(task: GenerateTask | null, auditEvents: AuditEvent[]) {
+  // 组合任务状态和审计事件，生成进度卡片渲染所需的完整结构。
   if (!task) {
     return null
   }

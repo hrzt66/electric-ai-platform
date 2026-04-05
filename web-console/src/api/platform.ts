@@ -16,14 +16,17 @@ async function unwrap<T>(request: Promise<{ data: ApiEnvelope<T> }>): Promise<T>
   return response.data.data
 }
 
+// createGenerateTask 提交一条新的真实生成任务。
 export function createGenerateTask(payload: GenerateTaskRequest) {
   return unwrap<GenerateTask>(http.post('/tasks/generate', payload))
 }
 
+// getTask 查询单个任务的最新状态。
 export function getTask(taskId: number) {
   return unwrap<GenerateTask>(http.get(`/tasks/${taskId}`))
 }
 
+// listTasks 拉取任务列表，并显式关闭浏览器缓存。
 export function listTasks() {
   return unwrap<GenerateTask[]>(
     http.get('/tasks', {
@@ -38,18 +41,22 @@ export function listTasks() {
   )
 }
 
+// listAssetHistory 拉取历史中心所需的资产列表。
 export function listAssetHistory() {
   return unwrap<AssetHistoryItem[]>(http.get('/assets/history'))
 }
 
+// getAssetDetail 查询单个资产的详细信息。
 export function getAssetDetail(assetId: number) {
   return unwrap<AssetDetail>(http.get(`/assets/history/${assetId}`))
 }
 
+// listTaskAuditEvents 拉取某个任务的审计时间线。
 export function listTaskAuditEvents(taskId: number) {
   return unwrap<AuditEvent[]>(http.get(`/audit/tasks/${taskId}/events`))
 }
 
+// listModels 拉取模型中心展示用的模型目录。
 export function listModels() {
   return unwrap<ModelRecord[]>(http.get('/models'))
 }

@@ -26,6 +26,7 @@ class ScoringService:
         shared_clip_runtime=None,
         release_after_batch: bool = False,
     ) -> None:
+        """注入各维度评分运行时，并配置批处理结束后是否自动释放资源。"""
         self._visual_runtime = visual_runtime
         self._text_runtime = text_runtime
         self._physical_runtime = physical_runtime
@@ -41,6 +42,7 @@ class ScoringService:
         physical_plausibility: float,
         composition_aesthetics: float,
     ) -> dict[str, float]:
+        """对四个维度做工程校准后，按权重生成最终综合得分。"""
         # 这里对原始分数做轻量校准，避免真实模型输出长期偏向“保真度过高、文本一致性偏低”。
         calibrated = {
             "visual_fidelity": self._compress_high_tail(visual_fidelity, knee=72.0, scale=0.38),
@@ -58,6 +60,7 @@ class ScoringService:
         }
 
     def score_batch(self, job, images: list[dict]) -> list[dict]:
+        """对一批生成图片逐张评分，并整理成资产服务可直接入库的结构。"""
         # 评分结果直接按资产入库结构组织，减少 Worker 与资产服务之间的二次转换。
         scored_items: list[dict] = []
         for image in images:
@@ -81,6 +84,7 @@ class ScoringService:
         return scored_items
 
     def _score_image(self, *, image_path: str, prompt: str) -> dict[str, float]:
+        """对单张图片完成四维评分，必要时退回 mock 评分兜底。"""
         # 当真实评分运行时缺失时退回 mock 评分，保证开发与测试链路仍然可跑通。
         if self._text_runtime is None or self._aesthetics_runtime is None:
             return score_from_prompt(prompt)
@@ -104,6 +108,7 @@ class ScoringService:
         )
 
     def release_resources(self) -> None:
+        """统一释放各评分运行时持有的模型资源。"""
         # 所有评分运行时都遵循 unload 协议，便于在任务结束后统一释放显存。
         for runtime in (
             self._visual_runtime,
@@ -117,6 +122,7 @@ class ScoringService:
 
     @staticmethod
     def _compress_high_tail(score: float, *, knee: float, scale: float) -> float:
+        """压缩高分段增幅，防止某个维度长期虚高。"""
         bounded = max(0.0, min(100.0, float(score)))
         if bounded <= knee:
             return round(bounded, 2)
@@ -124,6 +130,7 @@ class ScoringService:
 
     @staticmethod
     def _lift_low_band(score: float, *, target: float, gain: float) -> float:
+        """温和抬升过低分段，缓解系统性偏低问题。"""
         bounded = max(0.0, min(100.0, float(score)))
         if bounded >= target:
             return round(bounded, 2)

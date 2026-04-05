@@ -19,6 +19,7 @@ func New(modelController *controller.ModelController) *gin.Engine {
 
 	v1 := engine.Group("/api/v1")
 	models := v1.Group("/models")
+	models.GET("", modelController.ListActive)
 	models.GET("/active", modelController.ListActive)
 
 	return engine

@@ -25,3 +25,125 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+
+  auth-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/auth-service.Dockerfile
+    environment:
+      APP_NAME: auth-service
+      HTTP_PORT: 8081
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8081"
+
+  model-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/model-service.Dockerfile
+    environment:
+      APP_NAME: model-service
+      HTTP_PORT: 8082
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8082"
+
+  task-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/task-service.Dockerfile
+    environment:
+      APP_NAME: task-service
+      HTTP_PORT: 8083
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8083"
+
+  asset-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/asset-service.Dockerfile
+    environment:
+      APP_NAME: asset-service
+      HTTP_PORT: 8084
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8084"
+
+  audit-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/audit-service.Dockerfile
+    environment:
+      APP_NAME: audit-service
+      HTTP_PORT: 8085
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8085"
+
+  gateway-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/gateway-service.Dockerfile
+    environment:
+      APP_NAME: gateway-service
+      HTTP_PORT: 8080
+      JWT_SECRET: electric-ai-secret
+      AUTH_SERVICE_URL: http://auth-service:8081
+      MODEL_SERVICE_URL: http://model-service:8082
+      TASK_SERVICE_URL: http://task-service:8083
+    depends_on:
+      auth-service:
+        condition: service_started
+      model-service:
+        condition: service_started
+      task-service:
+        condition: service_started
+    ports:
+      - "8080:8080"
+
+  python-ai-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/python-ai-service.Dockerfile
+    ports:
+      - "8090:8090"
+    volumes:
+      - ../storage:/storage
+
+  web-console:
+    build:
+      context: ..
+      dockerfile: deploy/docker/web-console.Dockerfile
+    depends_on:
+      gateway-service:
+        condition: service_started
+    ports:
+      - "8088:80"

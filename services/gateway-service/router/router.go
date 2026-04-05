@@ -22,6 +22,7 @@ func New(upstreams Upstreams) *gin.Engine {
 
 	secured := r.Group("/")
 	secured.Use(middleware.RequireBearer())
+	secured.Any("/api/v1/models", gin.WrapH(upstreams.Model))
 	secured.Any("/api/v1/models/*path", gin.WrapH(upstreams.Model))
 	secured.Any("/api/v1/tasks/*path", gin.WrapH(upstreams.Task))
 	return r

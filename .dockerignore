@@ -1,0 +1,8 @@
+.git
+.worktrees
+.idea
+__pycache__
+*.pyc
+.pytest_cache
+web-console/node_modules
+web-console/dist

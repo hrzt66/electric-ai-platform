@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -18,8 +19,8 @@ func NewAssetController(svc *service.AssetService) *AssetController {
 	return &AssetController{svc: svc}
 }
 
-func (c *AssetController) SaveGenerateResult(ctx *gin.Context) {
-	var req model.SaveGenerateResultInput
+func (c *AssetController) SaveGenerateResults(ctx *gin.Context) {
+	var req model.SaveGenerateResultsInput
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"code":    1,
@@ -28,7 +29,7 @@ func (c *AssetController) SaveGenerateResult(ctx *gin.Context) {
 		return
 	}
 
-	image, err := c.svc.SaveGenerateResult(ctx.Request.Context(), req)
+	items, err := c.svc.SaveGenerateResults(ctx.Request.Context(), req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"code":    1,
@@ -37,5 +38,40 @@ func (c *AssetController) SaveGenerateResult(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, httpx.OK(image, "asset-save"))
+	ctx.JSON(http.StatusOK, httpx.OK(items, "asset-save"))
+}
+
+func (c *AssetController) ListHistory(ctx *gin.Context) {
+	items, err := c.svc.ListHistory(ctx.Request.Context())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    1,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, httpx.OK(items, "asset-history"))
+}
+
+func (c *AssetController) GetAssetDetail(ctx *gin.Context) {
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": "invalid asset id",
+		})
+		return
+	}
+
+	detail, err := c.svc.GetAssetDetail(ctx.Request.Context(), id)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    1,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, httpx.OK(detail, "asset-detail"))
 }

@@ -1,41 +1,379 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useRoute } from 'vue-router'
 
-import { http } from '../api/http'
+import GenerationProgressCard from '../components/workbench/GenerationProgressCard.vue'
+import ParameterPanel from '../components/workbench/ParameterPanel.vue'
+import ResultPreview from '../components/workbench/ResultPreview.vue'
+import ScoreRadar from '../components/workbench/ScoreRadar.vue'
+import { usePlatformStore } from '../stores/platform'
+import type { GenerateTaskRequest, ModelRecord, ScoreSummary } from '../types/platform'
+import { FRONTEND_DEFAULT_NEGATIVE_PROMPT, FRONTEND_DEFAULT_POSITIVE_PROMPT } from './generate-defaults'
 
-const form = reactive({
-  prompt: 'A wind turbine farm at sunset',
-  negative_prompt: 'blurry',
-  model_name: 'UniPic-2',
+const route = useRoute()
+const platformStore = usePlatformStore()
+const activeIndex = ref(0)
+const pollingInFlight = ref(false)
+const workbenchLoading = ref(false)
+const workbenchError = ref('')
+let pollTimer: number | null = null
+
+// 生成表单与后端请求结构保持同名，减少提交时的字段映射成本。
+const form = reactive<GenerateTaskRequest>({
+  prompt: FRONTEND_DEFAULT_POSITIVE_PROMPT,
+  negative_prompt: FRONTEND_DEFAULT_NEGATIVE_PROMPT,
+  model_name: 'sd15-electric',
+  seed: -1,
+  steps: 20,
+  guidance_scale: 7.5,
+  width: 512,
+  height: 512,
+  num_images: 1,
 })
 
-const currentJobId = ref<number | null>(null)
+const activeAsset = computed(() => platformStore.currentAssets[activeIndex.value] ?? null)
+const generationModels = computed(() => platformStore.models.filter((item) => item.model_type === 'generation'))
+const currentModel = computed(() => platformStore.models.find((item) => item.model_name === form.model_name) ?? null)
+const activeScores = computed<ScoreSummary | null>(() => {
+  if (!activeAsset.value) {
+    return null
+  }
+
+  return {
+    visual_fidelity: activeAsset.value.visual_fidelity,
+    text_consistency: activeAsset.value.text_consistency,
+    physical_plausibility: activeAsset.value.physical_plausibility,
+    composition_aesthetics: activeAsset.value.composition_aesthetics,
+    total_score: activeAsset.value.total_score,
+  }
+})
+
+function stopPolling() {
+  if (pollTimer !== null) {
+    window.clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+async function tickTask(taskId: number) {
+  // 单个任务轮询期间始终串行刷新，避免前一次请求未结束又发起下一次刷新。
+  if (pollingInFlight.value) {
+    return
+  }
+
+  pollingInFlight.value = true
+  try {
+    const task = await platformStore.refreshTask(taskId)
+    if (task.status === 'completed') {
+      ElMessage.success(`任务 #${task.id} 已完成，评分结果已同步。`)
+      stopPolling()
+    } else if (task.status === 'failed') {
+      ElMessage.error(task.error_message || `任务 #${task.id} 执行失败。`)
+      stopPolling()
+    }
+  } catch (error) {
+    stopPolling()
+    ElMessage.error('刷新任务状态失败，请检查任务服务与网关链路。')
+  } finally {
+    pollingInFlight.value = false
+  }
+}
+
+async function startPolling(taskId: number) {
+  stopPolling()
+  await tickTask(taskId)
+  pollTimer = window.setInterval(() => {
+    void tickTask(taskId)
+  }, 3000)
+}
 
 async function submit() {
-  const { data } = await http.post('/tasks/generate', form)
-  currentJobId.value = data.data.id
+  try {
+    const task = await platformStore.submitGenerateJob({ ...form })
+    activeIndex.value = 0
+    await startPolling(task.id)
+    ElMessage.success(`任务 #${task.id} 已提交，正在进入真实生成链路。`)
+  } catch (error: any) {
+    ElMessage.error(error?.response?.data?.message || '提交任务失败，请确认已登录并检查网关服务。')
+  }
 }
+
+function fillDefaults(model: ModelRecord) {
+  // 生成模型回退到前端默认提示词，其它模型优先采用注册表里配置的默认词。
+  if (model.model_type === 'generation') {
+    form.prompt = FRONTEND_DEFAULT_POSITIVE_PROMPT
+    form.negative_prompt = FRONTEND_DEFAULT_NEGATIVE_PROMPT
+    return
+  }
+
+  if (model.default_positive_prompt) {
+    form.prompt = model.default_positive_prompt
+  }
+  if (model.default_negative_prompt) {
+    form.negative_prompt = model.default_negative_prompt
+  }
+}
+
+function syncModelFromRoute() {
+  const requestedModel = typeof route.query.model === 'string' ? route.query.model : ''
+  if (requestedModel && generationModels.value.some((item) => item.model_name === requestedModel)) {
+    form.model_name = requestedModel
+  }
+}
+
+watch(
+  () => route.query.model,
+  () => {
+    syncModelFromRoute()
+  },
+)
+
+watch(
+  () => platformStore.currentAssets.length,
+  (count) => {
+    if (activeIndex.value >= count) {
+      activeIndex.value = 0
+    }
+  },
+)
+
+const hasWorkbenchData = computed(() => generationModels.value.length > 0 || Boolean(platformStore.currentTask))
+
+async function bootstrapWorkbench() {
+  // 首次进入页面时先准备模型列表，如果上一次任务仍在执行则继续接管轮询。
+  workbenchLoading.value = !hasWorkbenchData.value
+  workbenchError.value = ''
+
+  try {
+    await platformStore.fetchModels()
+    syncModelFromRoute()
+    if (currentModel.value) {
+      fillDefaults(currentModel.value)
+    }
+    if (platformStore.currentTaskId) {
+      await startPolling(platformStore.currentTaskId)
+    }
+  } catch (error) {
+    workbenchError.value = platformStore.modelsLoadError || platformStore.taskLoadError || '生成工作台加载失败，请检查模型服务与任务链路。'
+  } finally {
+    workbenchLoading.value = false
+  }
+}
+
+onMounted(() => {
+  void bootstrapWorkbench()
+})
+
+onBeforeUnmount(() => {
+  stopPolling()
+})
 </script>
 
 <template>
-  <div class="page">
-    <el-card>
-      <template #header>
-        <span>Create Generate Task</span>
-      </template>
-      <el-form @submit.prevent="submit">
-        <el-form-item label="Prompt"><el-input v-model="form.prompt" type="textarea" /></el-form-item>
-        <el-form-item label="Negative Prompt"><el-input v-model="form.negative_prompt" /></el-form-item>
-        <el-form-item label="Model"><el-input v-model="form.model_name" /></el-form-item>
-        <el-button type="primary" @click="submit">提交生成任务</el-button>
-      </el-form>
-      <p v-if="currentJobId">当前任务 ID: {{ currentJobId }}</p>
-    </el-card>
+  <div class="workbench">
+    <el-alert v-if="workbenchError" class="workbench-alert" :closable="false" type="warning" show-icon :title="workbenchError" />
+
+    <template v-if="workbenchLoading">
+      <section class="page-skeleton"><el-skeleton animated :rows="10" /></section>
+      <section class="page-skeleton"><el-skeleton animated :rows="10" /></section>
+      <section class="page-skeleton"><el-skeleton animated :rows="8" /></section>
+    </template>
+
+    <template v-else>
+      <ParameterPanel
+        :form="form"
+        :models="generationModels"
+        :submitting="platformStore.submitting"
+        @submit="submit"
+        @fill-defaults="fillDefaults"
+      />
+
+      <div class="preview-column">
+        <ResultPreview
+          :assets="platformStore.currentAssets"
+          :active-index="activeIndex"
+          :task="platformStore.currentTask"
+          @update:active-index="activeIndex = $event"
+        />
+        <GenerationProgressCard :task="platformStore.currentTask" :audit-events="platformStore.currentTaskAudit" />
+      </div>
+
+      <div class="side-column">
+        <ScoreRadar :scores="activeScores" />
+
+        <section class="status-card">
+          <div class="status-header">
+            <div>
+              <p class="status-eyebrow">任务轨迹</p>
+              <h2 class="status-title">实时状态</h2>
+            </div>
+            <el-tag
+              v-if="platformStore.currentTask"
+              :type="platformStore.currentTask.status === 'completed' ? 'success' : platformStore.currentTask.status === 'failed' ? 'danger' : 'warning'"
+            >
+              {{ platformStore.currentTask.stage }}
+            </el-tag>
+          </div>
+
+          <el-empty v-if="!platformStore.currentTask" description="提交任务后，这里会展示实时阶段与审计轨迹。" />
+
+          <template v-else>
+            <div class="status-meta">
+              <span>任务 ID #{{ platformStore.currentTask.id }}</span>
+              <span>{{ platformStore.currentTask.updated_at }}</span>
+            </div>
+
+            <el-alert
+              v-if="platformStore.currentTask.error_message"
+              type="error"
+              show-icon
+              :closable="false"
+              :title="platformStore.currentTask.error_message"
+            />
+
+            <div class="status-content">
+              <el-empty v-if="platformStore.currentTaskAudit.length === 0" description="当前还没有可展示的审计事件。" />
+
+              <el-timeline v-else>
+                <el-timeline-item v-for="event in platformStore.currentTaskAudit" :key="event.id" :timestamp="event.created_at" placement="top">
+                  <strong>{{ event.event_type }}</strong>
+                  <p class="timeline-body">{{ event.payload_json || event.message || '无附加信息' }}</p>
+                </el-timeline-item>
+              </el-timeline>
+            </div>
+          </template>
+        </section>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
-.page {
-  padding: 32px;
+.workbench {
+  display: grid;
+  grid-template-columns: minmax(280px, 312px) minmax(0, 1fr) minmax(268px, 296px);
+  gap: 16px;
+  align-items: start;
+}
+
+.workbench-alert {
+  grid-column: 1 / -1;
+}
+
+.page-skeleton {
+  border-radius: 22px;
+  padding: 18px;
+  background: #ffffff;
+  box-shadow: var(--ea-shadow);
+}
+
+.preview-column {
+  display: grid;
+  gap: 16px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+.side-column {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-height: 0;
+}
+
+.status-card {
+  padding: 16px;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: var(--ea-shadow);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.status-eyebrow,
+.status-title {
+  margin: 0;
+}
+
+.status-eyebrow {
+  font-size: 0.76rem;
+  color: #8a5c18;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.status-title {
+  margin-top: 4px;
+  color: #17202b;
+  font-size: 1.18rem;
+}
+
+.status-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  color: #53606f;
+  font-size: 0.82rem;
+}
+
+.status-content {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.timeline-body {
+  margin: 4px 0 0;
+  color: #53606f;
+  word-break: break-all;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+@media (min-width: 981px) {
+  .workbench {
+    height: calc(100vh - 148px);
+    overflow: hidden;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 1450px) {
+  .workbench {
+    grid-template-columns: minmax(280px, 304px) minmax(0, 1fr);
+  }
+
+  .side-column {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .status-card {
+    max-height: 340px;
+  }
+}
+
+@media (max-width: 980px) {
+  .workbench,
+  .side-column {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-column {
+    grid-template-rows: auto;
+  }
 }
 </style>

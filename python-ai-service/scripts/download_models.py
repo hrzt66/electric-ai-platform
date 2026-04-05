@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
+import time
 from pathlib import Path
 
 try:
@@ -15,8 +17,26 @@ ensure_project_root_on_path()
 from app.core.runtime_paths import RuntimePaths
 from app.core.settings import Settings, get_settings
 from app.schemas.runtime import RuntimeModelManifestEntry
+from requests.exceptions import ChunkedEncodingError
 
-OLD_AESTHETIC_WEIGHT = Path(r"E:\毕业设计\源代码\Project\sac+logos+ava1-l14-linearMSE.pth")
+DEFAULT_LEGACY_PROJECT_ROOT = Path(r"E:\毕业设计\源代码\Project")
+AESTHETIC_WEIGHT_FILENAME = "sac+logos+ava1-l14-linearMSE.pth"
+
+
+def get_legacy_project_root() -> Path:
+    value = os.getenv("ELECTRIC_AI_LEGACY_ROOT")
+    return Path(value) if value else DEFAULT_LEGACY_PROJECT_ROOT
+
+
+def resolve_aesthetic_weight_source(settings: Settings) -> Path:
+    candidates = [
+        get_legacy_project_root() / AESTHETIC_WEIGHT_FILENAME,
+        settings.scoring_model_dir / "aesthetic-predictor" / AESTHETIC_WEIGHT_FILENAME,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
 
 
 def get_model_manifest(settings: Settings | None = None) -> dict[str, dict[str, str | None]]:
@@ -36,7 +56,7 @@ def get_model_manifest(settings: Settings | None = None) -> dict[str, dict[str, 
             name="unipic2-kontext",
             target="generation",
             source="huggingface",
-            repo_id="powerlmp/unipic2-kontext",
+            repo_id="Skywork/UniPic2-SD3.5M-Kontext-2B",
             local_dir=str(paths.models_generation / "unipic2-kontext"),
             description="UniPic2 electric scene runtime",
         ),
@@ -52,7 +72,7 @@ def get_model_manifest(settings: Settings | None = None) -> dict[str, dict[str, 
             name="aesthetic-predictor",
             target="scoring",
             source="local-copy",
-            local_source=str(OLD_AESTHETIC_WEIGHT),
+            local_source=str(resolve_aesthetic_weight_source(runtime_settings)),
             local_dir=str(paths.models_scoring / "aesthetic-predictor"),
             description="LAION aesthetic linear head",
         ),
@@ -81,23 +101,53 @@ def _copy_local_weight(entry: dict[str, str | None]) -> dict[str, object]:
     }
 
 
-def _download_huggingface(entry: dict[str, str | None]) -> dict[str, object]:
-    try:
-        from huggingface_hub import snapshot_download
-    except ImportError:
-        return {
-            "status": "dependency-missing",
-            "repo_id": entry["repo_id"],
-            "local_dir": entry["local_dir"],
-        }
+def _download_huggingface(
+    entry: dict[str, str | None],
+    *,
+    snapshot_download_fn=None,
+    max_workers: int = 1,
+    retry_attempts: int = 3,
+) -> dict[str, object]:
+    if snapshot_download_fn is None:
+        try:
+            from huggingface_hub import snapshot_download
+        except ImportError:
+            return {
+                "status": "dependency-missing",
+                "repo_id": entry["repo_id"],
+                "local_dir": entry["local_dir"],
+            }
+        snapshot_download_fn = snapshot_download
 
     local_dir = Path(entry["local_dir"] or "")
     local_dir.mkdir(parents=True, exist_ok=True)
-    snapshot_download(repo_id=entry["repo_id"], local_dir=local_dir, local_dir_use_symlinks=False)
+
+    last_error: Exception | None = None
+    for attempt in range(1, retry_attempts + 1):
+        try:
+            snapshot_download_fn(
+                repo_id=entry["repo_id"],
+                local_dir=local_dir,
+                local_dir_use_symlinks=False,
+                max_workers=max_workers,
+                resume_download=True,
+            )
+            return {
+                "status": "downloaded",
+                "repo_id": entry["repo_id"],
+                "local_dir": str(local_dir),
+                "attempts": attempt,
+            }
+        except (ChunkedEncodingError, OSError) as exc:
+            last_error = exc
+            if attempt == retry_attempts:
+                break
+            time.sleep(min(5 * attempt, 15))
     return {
-        "status": "downloaded",
+        "status": "failed",
         "repo_id": entry["repo_id"],
         "local_dir": str(local_dir),
+        "error": str(last_error) if last_error else "unknown",
     }
 
 

@@ -20,6 +20,7 @@ func New(auditController *controller.AuditController) *gin.Engine {
 	v1 := engine.Group("/api/v1")
 	audit := v1.Group("/audit")
 	audit.POST("/task-events", auditController.RecordTaskEvent)
+	audit.GET("/tasks/:job_id/events", auditController.ListTaskEvents)
 
 	return engine
 }

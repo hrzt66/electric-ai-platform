@@ -28,9 +28,13 @@ class FakeAuditClient:
 class FakeRuntime:
     def __init__(self) -> None:
         self.prepared_jobs: list[int] = []
+        self.unloaded = False
 
     def prepare(self, job) -> None:
         self.prepared_jobs.append(job.job_id)
+
+    def unload(self) -> None:
+        self.unloaded = True
 
 
 class FakeRuntimeRegistry:
@@ -40,6 +44,10 @@ class FakeRuntimeRegistry:
     def get_generation_runtime(self, model_name: str) -> FakeRuntime:
         assert model_name == "sd15-electric"
         return self.runtime
+
+    def release_generation_runtime(self, model_name: str | None = None) -> None:
+        assert model_name in (None, "sd15-electric")
+        self.runtime.unload()
 
 
 class FakeGenerationService:
@@ -54,6 +62,9 @@ class FakeGenerationService:
 
 
 class FakeScoringService:
+    def __init__(self) -> None:
+        self.released = False
+
     def score_batch(self, job, images: list[dict]) -> list[dict]:
         return [
             {
@@ -68,6 +79,9 @@ class FakeScoringService:
             }
             for image in images
         ]
+
+    def release_resources(self) -> None:
+        self.released = True
 
 
 def build_job():
@@ -93,13 +107,14 @@ def test_job_pipeline_updates_statuses_in_order():
     task_client = FakeTaskClient()
     asset_client = FakeAssetClient()
     audit_client = FakeAuditClient()
+    scoring_service = FakeScoringService()
     pipeline = JobPipeline(
         task_client=task_client,
         asset_client=asset_client,
         audit_client=audit_client,
         runtime_registry=FakeRuntimeRegistry(),
         generation_service=FakeGenerationService(),
-        scoring_service=FakeScoringService(),
+        scoring_service=scoring_service,
     )
 
     pipeline.run(build_job())
@@ -115,21 +130,49 @@ def test_job_pipeline_updates_statuses_in_order():
     assert asset_client.saved_payload is not None
     assert asset_client.saved_payload["job_id"] == 7
     assert len(audit_client.events) >= 2
+    assert pipeline._runtime_registry.runtime.unloaded is True
+    assert scoring_service.released is True
 
 
 def test_job_pipeline_marks_failed_on_generation_error():
     from app.services.job_pipeline import JobPipeline
 
     task_client = FakeTaskClient()
+    scoring_service = FakeScoringService()
     pipeline = JobPipeline(
         task_client=task_client,
         asset_client=FakeAssetClient(),
         audit_client=FakeAuditClient(),
         runtime_registry=FakeRuntimeRegistry(),
         generation_service=FakeGenerationService(fail=True),
-        scoring_service=FakeScoringService(),
+        scoring_service=scoring_service,
     )
 
     pipeline.run(build_job())
 
     assert task_client.statuses[-1] == (7, "failed", "failed", "generation exploded")
+    assert pipeline._runtime_registry.runtime.unloaded is True
+    assert scoring_service.released is True
+
+
+def test_job_pipeline_emits_runtime_logs(caplog):
+    from app.services.job_pipeline import JobPipeline
+
+    caplog.set_level("INFO", logger="electric_ai.runtime")
+
+    pipeline = JobPipeline(
+        task_client=FakeTaskClient(),
+        asset_client=FakeAssetClient(),
+        audit_client=FakeAuditClient(),
+        runtime_registry=FakeRuntimeRegistry(),
+        generation_service=FakeGenerationService(),
+        scoring_service=FakeScoringService(),
+    )
+
+    pipeline.run(build_job())
+
+    messages = "\n".join(record.getMessage() for record in caplog.records)
+    assert "job 7 starting" in messages
+    assert "job 7 generation completed" in messages
+    assert "job 7 completed" in messages
+    assert "job 7 releasing generation runtime" in messages

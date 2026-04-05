@@ -1,5 +1,6 @@
 .worktrees/
 .superpowers/
+.env.local
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -7,3 +8,4 @@ storage/images/*.png
 !storage/images/.gitkeep
 web-console/node_modules/
 web-console/dist/
+.runtime-logs/

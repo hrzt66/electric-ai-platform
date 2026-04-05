@@ -11,11 +11,17 @@ CREATE TABLE auth_users (
 CREATE TABLE model_registry (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     model_name VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255) NOT NULL,
     model_type VARCHAR(32) NOT NULL,
     service_name VARCHAR(128) NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'active',
+    description TEXT NULL,
+    default_positive_prompt TEXT NULL,
+    default_negative_prompt TEXT NULL,
+    local_path TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_model_registry_model_name (model_name)
 );
 
 CREATE TABLE model_prompt_templates (
@@ -32,10 +38,12 @@ CREATE TABLE task_jobs (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     job_type VARCHAR(32) NOT NULL,
     status VARCHAR(32) NOT NULL,
-    payload_json JSON NOT NULL,
-    result_json JSON NULL,
+    stage VARCHAR(32) NOT NULL DEFAULT 'queued',
+    model_name VARCHAR(128) NOT NULL,
+    prompt TEXT NULL,
+    negative_prompt TEXT NULL,
+    payload_json LONGTEXT NOT NULL,
     error_message TEXT NULL,
-    retry_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -80,8 +88,9 @@ CREATE TABLE asset_image_scores (
 CREATE TABLE audit_task_events (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     job_id BIGINT NOT NULL,
-    event_type VARCHAR(64) NOT NULL,
-    message VARCHAR(255) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    message TEXT NULL,
+    payload_json LONGTEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_audit_task_events_job_id (job_id),
     CONSTRAINT fk_audit_task_events_job FOREIGN KEY (job_id) REFERENCES task_jobs(id)

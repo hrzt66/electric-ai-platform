@@ -1,0 +1,235 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: electric_ai
+    ports:
+      - "${MYSQL_PORT:-13307}:3306"
+    volumes:
+      - ./mysql/init:/docker-entrypoint-initdb.d
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7.2
+    ports:
+      - "${REDIS_PORT:-16380}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  auth-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/auth-service.Dockerfile
+    environment:
+      APP_NAME: auth-service
+      HTTP_PORT: 8081
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8081"
+
+  model-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/model-service.Dockerfile
+    environment:
+      APP_NAME: model-service
+      HTTP_PORT: 8082
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8082"
+
+  task-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/task-service.Dockerfile
+    environment:
+      APP_NAME: task-service
+      HTTP_PORT: 8083
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8083"
+
+  asset-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/asset-service.Dockerfile
+    environment:
+      APP_NAME: asset-service
+      HTTP_PORT: 8084
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8084"
+
+  audit-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/audit-service.Dockerfile
+    environment:
+      APP_NAME: audit-service
+      HTTP_PORT: 8085
+      MYSQL_DSN: root:root@tcp(mysql:3306)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: electric-ai-secret
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8085"
+
+  python-ai-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/python-ai-service.Dockerfile
+    environment:
+      ELECTRIC_AI_RUNTIME_ROOT: /runtime
+      TASK_SERVICE_BASE_URL: http://task-service:8083
+      ASSET_SERVICE_BASE_URL: http://asset-service:8084
+      AUDIT_SERVICE_BASE_URL: http://audit-service:8085
+      MODEL_SERVICE_BASE_URL: http://model-service:8082
+      REDIS_URL: redis://redis:6379/0
+      HF_HOME: /runtime/hf-home
+      TRANSFORMERS_CACHE: /runtime/hf-home
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    command: ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8090"]
+    volumes:
+      - G:/electric-ai-runtime:/runtime
+    depends_on:
+      redis:
+        condition: service_healthy
+      task-service:
+        condition: service_started
+      asset-service:
+        condition: service_started
+      audit-service:
+        condition: service_started
+      model-service:
+        condition: service_started
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "${PYTHON_RUNTIME_PORT:-18090}:8090"
+
+  python-ai-worker:
+    build:
+      context: ..
+      dockerfile: deploy/docker/python-ai-service.Dockerfile
+    environment:
+      ELECTRIC_AI_RUNTIME_ROOT: /runtime
+      TASK_SERVICE_BASE_URL: http://task-service:8083
+      ASSET_SERVICE_BASE_URL: http://asset-service:8084
+      AUDIT_SERVICE_BASE_URL: http://audit-service:8085
+      MODEL_SERVICE_BASE_URL: http://model-service:8082
+      REDIS_URL: redis://redis:6379/0
+      HF_HOME: /runtime/hf-home
+      TRANSFORMERS_CACHE: /runtime/hf-home
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      ELECTRIC_AI_WORKER_NAME: docker-worker
+    command: ["python3", "-m", "app.worker"]
+    volumes:
+      - G:/electric-ai-runtime:/runtime
+    depends_on:
+      redis:
+        condition: service_healthy
+      task-service:
+        condition: service_started
+      asset-service:
+        condition: service_started
+      audit-service:
+        condition: service_started
+      model-service:
+        condition: service_started
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  gateway-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/gateway-service.Dockerfile
+    environment:
+      APP_NAME: gateway-service
+      HTTP_PORT: 8080
+      JWT_SECRET: electric-ai-secret
+      AUTH_SERVICE_URL: http://auth-service:8081
+      MODEL_SERVICE_URL: http://model-service:8082
+      TASK_SERVICE_URL: http://task-service:8083
+      ASSET_SERVICE_URL: http://asset-service:8084
+      AUDIT_SERVICE_URL: http://audit-service:8085
+      IMAGE_OUTPUT_DIR: /runtime/outputs/images
+    depends_on:
+      auth-service:
+        condition: service_started
+      model-service:
+        condition: service_started
+      task-service:
+        condition: service_started
+      asset-service:
+        condition: service_started
+      audit-service:
+        condition: service_started
+    volumes:
+      - G:/electric-ai-runtime:/runtime
+    ports:
+      - "${GATEWAY_PORT:-18080}:8080"
+
+  web-console:
+    build:
+      context: ..
+      dockerfile: deploy/docker/web-console.Dockerfile
+    depends_on:
+      gateway-service:
+        condition: service_started
+    ports:
+      - "${WEB_PORT:-18088}:80"
+
+volumes:
+  mysql_data:
+  redis_data:

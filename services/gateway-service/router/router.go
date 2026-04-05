@@ -1,6 +1,7 @@
 package router
 
 import (
+	"net/http"
 	"net/http/httputil"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +13,9 @@ type Upstreams struct {
 	Auth  *httputil.ReverseProxy
 	Model *httputil.ReverseProxy
 	Task  *httputil.ReverseProxy
+	Asset *httputil.ReverseProxy
+	Audit *httputil.ReverseProxy
+	Files http.Handler
 }
 
 func New(upstreams Upstreams) *gin.Engine {
@@ -24,6 +28,13 @@ func New(upstreams Upstreams) *gin.Engine {
 	secured.Use(middleware.RequireBearer())
 	secured.Any("/api/v1/models", gin.WrapH(upstreams.Model))
 	secured.Any("/api/v1/models/*path", gin.WrapH(upstreams.Model))
+	secured.Any("/api/v1/tasks", gin.WrapH(upstreams.Task))
 	secured.Any("/api/v1/tasks/*path", gin.WrapH(upstreams.Task))
+	secured.Any("/api/v1/assets", gin.WrapH(upstreams.Asset))
+	secured.Any("/api/v1/assets/*path", gin.WrapH(upstreams.Asset))
+	secured.Any("/api/v1/audit", gin.WrapH(upstreams.Audit))
+	secured.Any("/api/v1/audit/*path", gin.WrapH(upstreams.Audit))
+
+	r.Any("/files/images/*path", gin.WrapH(upstreams.Files))
 	return r
 }

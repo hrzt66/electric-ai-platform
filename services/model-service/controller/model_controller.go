@@ -17,8 +17,8 @@ func NewModelController(svc *service.ModelService) *ModelController {
 	return &ModelController{svc: svc}
 }
 
-func (c *ModelController) ListActive(ctx *gin.Context) {
-	items, err := c.svc.ListActive(ctx.Request.Context())
+func (c *ModelController) ListModels(ctx *gin.Context) {
+	items, err := c.svc.ListModels(ctx.Request.Context())
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"code":    1,
@@ -28,4 +28,17 @@ func (c *ModelController) ListActive(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, httpx.OK(items, "model-list"))
+}
+
+func (c *ModelController) GetModel(ctx *gin.Context) {
+	item, err := c.svc.GetModel(ctx.Request.Context(), ctx.Param("name"))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    1,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, httpx.OK(item, "model-detail"))
 }

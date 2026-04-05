@@ -19,7 +19,9 @@ func New(assetController *controller.AssetController) *gin.Engine {
 
 	v1 := engine.Group("/api/v1")
 	assets := v1.Group("/assets")
-	assets.POST("/results", assetController.SaveGenerateResult)
+	assets.POST("/results", assetController.SaveGenerateResults)
+	assets.GET("/history", assetController.ListHistory)
+	assets.GET("/history/:id", assetController.GetAssetDetail)
 
 	return engine
 }

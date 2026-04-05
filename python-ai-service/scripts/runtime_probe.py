@@ -13,6 +13,7 @@ ensure_project_root_on_path()
 
 from app.core.runtime_paths import RuntimePaths
 from app.core.settings import get_settings
+from app.runtimes.runtime_registry import RuntimeRegistry
 from app.schemas.runtime import RuntimeProbeReport
 
 
@@ -33,6 +34,7 @@ def build_runtime_probe() -> dict[str, object]:
     settings = get_settings()
     paths = RuntimePaths(settings.runtime_root)
     base_report = paths.build_probe_report()
+    runtime_registry = RuntimeRegistry(settings=settings)
 
     report = RuntimeProbeReport(
         runtime_root=base_report["runtime_root"],
@@ -46,7 +48,9 @@ def build_runtime_probe() -> dict[str, object]:
         python_version=sys.version.split()[0],
         cuda_available=_detect_cuda(),
     )
-    return report.model_dump()
+    payload = report.model_dump()
+    payload["models"] = runtime_registry.list_models()["items"]
+    return payload
 
 
 def main() -> int:

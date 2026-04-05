@@ -3,7 +3,10 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sync"
+
+	mysqlDriver "github.com/go-sql-driver/mysql"
 
 	"electric-ai/services/task-service/model"
 )
@@ -14,13 +17,16 @@ type TaskRepository struct {
 	schemaErr  error
 }
 
+// NewTaskRepository 创建任务仓储，并在首次访问时按需补齐本地调试所需表结构。
 func NewTaskRepository(db *sql.DB) *TaskRepository {
 	return &TaskRepository{db: db}
 }
 
-func (r *TaskRepository) ensureSchema(ctx context.Context) error {
-	r.schemaOnce.Do(func() {
-		const query = `
+// taskSchemaStatements 保存任务表的自举 SQL。
+// 这里同时兼容全新数据库和从早期版本平滑升级的场景。
+func taskSchemaStatements() []string {
+	return []string{
+		`
 CREATE TABLE IF NOT EXISTS task_jobs (
 	id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	job_type VARCHAR(32) NOT NULL,
@@ -34,11 +40,43 @@ CREATE TABLE IF NOT EXISTS task_jobs (
 	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )
-`
-		_, r.schemaErr = r.db.ExecContext(ctx, query)
+`,
+		`ALTER TABLE task_jobs ADD COLUMN stage VARCHAR(32) NOT NULL DEFAULT 'queued' AFTER status`,
+		`ALTER TABLE task_jobs ADD COLUMN model_name VARCHAR(128) NOT NULL DEFAULT '' AFTER stage`,
+		`ALTER TABLE task_jobs ADD COLUMN prompt TEXT NULL AFTER model_name`,
+		`ALTER TABLE task_jobs ADD COLUMN negative_prompt TEXT NULL AFTER prompt`,
+		`ALTER TABLE task_jobs MODIFY COLUMN payload_json LONGTEXT NOT NULL`,
+		`ALTER TABLE task_jobs ADD COLUMN error_message TEXT NULL AFTER payload_json`,
+		`UPDATE task_jobs SET stage = status WHERE stage = 'queued' AND status <> 'queued'`,
+	}
+}
+
+// ensureSchema 只在第一次调用时执行一次表结构补齐，避免每次请求重复迁移。
+func (r *TaskRepository) ensureSchema(ctx context.Context) error {
+	r.schemaOnce.Do(func() {
+		for _, statement := range taskSchemaStatements() {
+			if _, r.schemaErr = r.db.ExecContext(ctx, statement); r.schemaErr != nil {
+				if isIgnorableMigrationError(r.schemaErr) {
+					r.schemaErr = nil
+					continue
+				}
+				return
+			}
+		}
 	})
 	return r.schemaErr
 }
+
+// isIgnorableMigrationError 用于忽略“列已存在”一类幂等迁移错误。
+func isIgnorableMigrationError(err error) bool {
+	var mysqlErr *mysqlDriver.MySQLError
+	if !errors.As(err, &mysqlErr) {
+		return false
+	}
+	return mysqlErr.Number == 1060
+}
+
+// TODO: 生产环境建议把这部分 schema bootstrap 收敛到独立迁移流程，服务启动阶段只做只读校验。
 
 func (r *TaskRepository) Create(ctx context.Context, job model.Job) (model.Job, error) {
 	if err := r.ensureSchema(ctx); err != nil {
@@ -110,6 +148,7 @@ func (r *TaskRepository) List(ctx context.Context) ([]model.Job, error) {
 		return nil, err
 	}
 
+	// 历史列表默认按最新任务倒序返回，满足前端工作台与审计页的主要浏览路径。
 	const query = `
 SELECT id, job_type, status, stage, model_name, prompt, negative_prompt, payload_json, COALESCE(error_message, ''), created_at, updated_at
 FROM task_jobs

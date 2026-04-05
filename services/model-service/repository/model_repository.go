@@ -3,23 +3,156 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"sync"
+
+	mysqlDriver "github.com/go-sql-driver/mysql"
 
 	"electric-ai/services/model-service/model"
 )
 
 type ModelRepository struct {
-	db *sql.DB
+	db         *sql.DB
+	schemaOnce sync.Once
+	schemaErr  error
 }
 
 func NewModelRepository(db *sql.DB) *ModelRepository {
 	return &ModelRepository{db: db}
 }
 
-func (r *ModelRepository) ListActive(ctx context.Context) ([]model.RegistryModel, error) {
+func modelSchemaStatements() []string {
+	return []string{
+		`
+CREATE TABLE IF NOT EXISTS model_registry (
+	id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	model_name VARCHAR(128) NOT NULL,
+	display_name VARCHAR(255) NOT NULL,
+	model_type VARCHAR(64) NOT NULL,
+	service_name VARCHAR(128) NOT NULL,
+	status VARCHAR(32) NOT NULL,
+	description TEXT,
+	default_positive_prompt TEXT,
+	default_negative_prompt TEXT,
+	local_path TEXT,
+	UNIQUE KEY uk_model_registry_model_name (model_name)
+)
+`,
+		`ALTER TABLE model_registry MODIFY COLUMN model_name VARCHAR(128) NOT NULL`,
+		`ALTER TABLE model_registry ADD COLUMN display_name VARCHAR(255) NOT NULL DEFAULT '' AFTER model_name`,
+		`ALTER TABLE model_registry MODIFY COLUMN model_type VARCHAR(64) NOT NULL`,
+		`ALTER TABLE model_registry ADD COLUMN description TEXT NULL AFTER status`,
+		`ALTER TABLE model_registry ADD COLUMN default_positive_prompt TEXT NULL AFTER description`,
+		`ALTER TABLE model_registry ADD COLUMN default_negative_prompt TEXT NULL AFTER default_positive_prompt`,
+		`ALTER TABLE model_registry ADD COLUMN local_path TEXT NULL AFTER default_negative_prompt`,
+		`UPDATE model_registry SET display_name = model_name WHERE display_name = ''`,
+		`
+DELETE target
+FROM model_registry AS target
+INNER JOIN model_registry AS keeper
+	ON target.model_name = keeper.model_name
+	AND target.id > keeper.id
+`,
+		`ALTER TABLE model_registry ADD UNIQUE INDEX uk_model_registry_model_name (model_name)`,
+	}
+}
+
+func (r *ModelRepository) ensureSchema(ctx context.Context) error {
+	r.schemaOnce.Do(func() {
+		for _, statement := range modelSchemaStatements() {
+			if _, r.schemaErr = r.db.ExecContext(ctx, statement); r.schemaErr != nil {
+				if isIgnorableMigrationError(r.schemaErr) {
+					r.schemaErr = nil
+					continue
+				}
+				return
+			}
+		}
+
+		seeds := []model.RegistryModel{
+			{
+				ModelName:             "sd15-electric",
+				DisplayName:           "Stable Diffusion 1.5 Electric",
+				ModelType:             "generation",
+				ServiceName:           "python-ai-service",
+				Status:                "available",
+				Description:           "SD1.5 baseline generation runtime for electric scenes",
+				DefaultPositivePrompt: "500kV substation, industrial realism, detailed power equipment",
+				DefaultNegativePrompt: "blurry, low quality, disconnected wires, deformed insulators",
+				LocalPath:             `G:\electric-ai-runtime\models\generation\sd15-electric`,
+			},
+			{
+				ModelName:             "unipic2-kontext",
+				DisplayName:           "UniPic2 Kontext",
+				ModelType:             "generation",
+				ServiceName:           "python-ai-service",
+				Status:                "experimental",
+				Description:           "Advanced electric scene generation runtime",
+				DefaultPositivePrompt: "inspection robot, transformer yard, contextual electric environment",
+				DefaultNegativePrompt: "artifact, low detail, unrealistic scale",
+				LocalPath:             `G:\electric-ai-runtime\models\generation\unipic2-kontext`,
+			},
+			{
+				ModelName:             "image-reward",
+				DisplayName:           "ImageReward",
+				ModelType:             "scoring",
+				ServiceName:           "python-ai-service",
+				Status:                "available",
+				Description:           "Text-image alignment scoring runtime",
+				DefaultPositivePrompt: "alignment scorer",
+				DefaultNegativePrompt: "",
+				LocalPath:             `G:\electric-ai-runtime\models\scoring\image-reward`,
+			},
+			{
+				ModelName:             "aesthetic-predictor",
+				DisplayName:           "Aesthetic Predictor",
+				ModelType:             "scoring",
+				ServiceName:           "python-ai-service",
+				Status:                "available",
+				Description:           "Aesthetic and composition scoring runtime",
+				DefaultPositivePrompt: "aesthetic scorer",
+				DefaultNegativePrompt: "",
+				LocalPath:             `G:\electric-ai-runtime\models\scoring\aesthetic-predictor`,
+			},
+		}
+
+		for _, seed := range seeds {
+			if _, r.schemaErr = r.db.ExecContext(ctx, `
+INSERT INTO model_registry (model_name, display_name, model_type, service_name, status, description, default_positive_prompt, default_negative_prompt, local_path)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+	display_name = VALUES(display_name),
+	model_type = VALUES(model_type),
+	service_name = VALUES(service_name),
+	status = VALUES(status),
+	description = VALUES(description),
+	default_positive_prompt = VALUES(default_positive_prompt),
+	default_negative_prompt = VALUES(default_negative_prompt),
+	local_path = VALUES(local_path)
+`, seed.ModelName, seed.DisplayName, seed.ModelType, seed.ServiceName, seed.Status, seed.Description, seed.DefaultPositivePrompt, seed.DefaultNegativePrompt, seed.LocalPath); r.schemaErr != nil {
+				return
+			}
+		}
+	})
+	return r.schemaErr
+}
+
+func isIgnorableMigrationError(err error) bool {
+	var mysqlErr *mysqlDriver.MySQLError
+	if !errors.As(err, &mysqlErr) {
+		return false
+	}
+	return mysqlErr.Number == 1060 || mysqlErr.Number == 1061
+}
+
+func (r *ModelRepository) ListCatalog(ctx context.Context) ([]model.RegistryModel, error) {
+	if err := r.ensureSchema(ctx); err != nil {
+		return nil, err
+	}
+
 	const query = `
-SELECT id, model_name, model_type, service_name, status
+SELECT id, model_name, display_name, model_type, service_name, status, COALESCE(description, ''), COALESCE(default_positive_prompt, ''), COALESCE(default_negative_prompt, ''), COALESCE(local_path, '')
 FROM model_registry
-WHERE status = 'active'
 ORDER BY id ASC
 `
 
@@ -35,9 +168,14 @@ ORDER BY id ASC
 		if err := rows.Scan(
 			&item.ID,
 			&item.ModelName,
+			&item.DisplayName,
 			&item.ModelType,
 			&item.ServiceName,
 			&item.Status,
+			&item.Description,
+			&item.DefaultPositivePrompt,
+			&item.DefaultNegativePrompt,
+			&item.LocalPath,
 		); err != nil {
 			return nil, err
 		}
@@ -49,4 +187,33 @@ ORDER BY id ASC
 	}
 
 	return items, nil
+}
+
+func (r *ModelRepository) GetByName(ctx context.Context, modelName string) (model.RegistryModel, error) {
+	if err := r.ensureSchema(ctx); err != nil {
+		return model.RegistryModel{}, err
+	}
+
+	const query = `
+SELECT id, model_name, display_name, model_type, service_name, status, COALESCE(description, ''), COALESCE(default_positive_prompt, ''), COALESCE(default_negative_prompt, ''), COALESCE(local_path, '')
+FROM model_registry
+WHERE model_name = ?
+`
+
+	var item model.RegistryModel
+	if err := r.db.QueryRowContext(ctx, query, modelName).Scan(
+		&item.ID,
+		&item.ModelName,
+		&item.DisplayName,
+		&item.ModelType,
+		&item.ServiceName,
+		&item.Status,
+		&item.Description,
+		&item.DefaultPositivePrompt,
+		&item.DefaultNegativePrompt,
+		&item.LocalPath,
+	); err != nil {
+		return model.RegistryModel{}, err
+	}
+	return item, nil
 }

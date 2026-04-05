@@ -1,0 +1,282 @@
+import { defineStore } from 'pinia'
+
+import {
+  createGenerateTask,
+  getAssetDetail,
+  getTask,
+  listAssetHistory,
+  listModels,
+  listTaskAuditEvents,
+  listTasks,
+} from '../api/platform'
+import type {
+  AssetDetail,
+  AssetHistoryItem,
+  AuditEvent,
+  GenerateTask,
+  GenerateTaskRequest,
+  ModelRecord,
+} from '../types/platform'
+
+const CACHE_TTL_MS = 5_000
+
+function isCacheFresh(timestamp: number, ttl = CACHE_TTL_MS) {
+  return timestamp > 0 && Date.now() - timestamp < ttl
+}
+
+function ensureArray<T>(value: T[] | null | undefined): T[] {
+  // 后端偶发返回 null 时，在 store 层兜底为 []，避免页面计算属性直接崩掉。
+  return Array.isArray(value) ? value : []
+}
+
+function extractErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error !== null) {
+    const responseMessage = (error as { response?: { data?: { message?: unknown } } }).response?.data?.message
+    if (typeof responseMessage === 'string' && responseMessage.trim()) {
+      return responseMessage
+    }
+
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) {
+      return message
+    }
+  }
+
+  return fallback
+}
+
+type PlatformState = {
+  models: ModelRecord[]
+  tasks: GenerateTask[]
+  history: AssetHistoryItem[]
+  currentTask: GenerateTask | null
+  currentAssets: AssetHistoryItem[]
+  currentTaskAudit: AuditEvent[]
+  selectedAssetDetail: AssetDetail | null
+  submitting: boolean
+  loadingTasks: boolean
+  loadingHistory: boolean
+  loadingModels: boolean
+  loadingTask: boolean
+  tasksLoadError: string | null
+  historyLoadError: string | null
+  modelsLoadError: string | null
+  taskLoadError: string | null
+  tasksLoadedAt: number
+  historyLoadedAt: number
+  modelsLoadedAt: number
+  tasksRequest: Promise<GenerateTask[]> | null
+  historyRequest: Promise<AssetHistoryItem[]> | null
+  modelsRequest: Promise<ModelRecord[]> | null
+  taskRequests: Record<number, Promise<GenerateTask>>
+}
+
+export const usePlatformStore = defineStore('platform', {
+  state: (): PlatformState => ({
+    models: [],
+    tasks: [],
+    history: [],
+    currentTask: null,
+    currentAssets: [],
+    currentTaskAudit: [],
+    selectedAssetDetail: null,
+    submitting: false,
+    loadingTasks: false,
+    loadingHistory: false,
+    loadingModels: false,
+    loadingTask: false,
+    tasksLoadError: null,
+    historyLoadError: null,
+    modelsLoadError: null,
+    taskLoadError: null,
+    tasksLoadedAt: 0,
+    historyLoadedAt: 0,
+    modelsLoadedAt: 0,
+    tasksRequest: null,
+    historyRequest: null,
+    modelsRequest: null,
+    taskRequests: {},
+  }),
+  getters: {
+    currentTaskId(state) {
+      return state.currentTask?.id ?? null
+    },
+  },
+  actions: {
+    async submitGenerateJob(payload: GenerateTaskRequest) {
+      this.submitting = true
+      try {
+        const task = await createGenerateTask(payload)
+        this.currentTask = task
+        this.tasks = [task, ...this.tasks.filter((item) => item.id !== task.id)]
+        this.tasksLoadedAt = Date.now()
+        this.tasksLoadError = null
+        this.currentAssets = []
+        this.currentTaskAudit = []
+        this.selectedAssetDetail = null
+        this.taskLoadError = null
+        return task
+      } finally {
+        this.submitting = false
+      }
+    },
+
+    async fetchTasks(options?: { force?: boolean }) {
+      const force = options?.force ?? false
+
+      if (!force && this.tasksRequest) {
+        // 同一时间只复用一个请求，避免用户连点导航时触发重复拉取。
+        return this.tasksRequest
+      }
+
+      if (!force && isCacheFresh(this.tasksLoadedAt)) {
+        return this.tasks
+      }
+
+      this.loadingTasks = true
+      this.tasksLoadError = null
+
+      const request = listTasks()
+        .then((tasks) => {
+          this.tasks = ensureArray(tasks)
+          this.tasksLoadedAt = Date.now()
+          return this.tasks
+        })
+        .catch((error) => {
+          this.tasksLoadError = extractErrorMessage(error, '任务列表加载失败')
+          throw error
+        })
+        .finally(() => {
+          if (this.tasksRequest === request) {
+            this.tasksRequest = null
+          }
+          this.loadingTasks = false
+        })
+
+      this.tasksRequest = request
+      return request
+    },
+
+    async fetchModels(options?: { force?: boolean }) {
+      const force = options?.force ?? false
+
+      if (!force && this.modelsRequest) {
+        return this.modelsRequest
+      }
+
+      if (!force && isCacheFresh(this.modelsLoadedAt)) {
+        return this.models
+      }
+
+      this.loadingModels = true
+      this.modelsLoadError = null
+
+      const request = listModels()
+        .then((models) => {
+          this.models = ensureArray(models)
+          this.modelsLoadedAt = Date.now()
+          return this.models
+        })
+        .catch((error) => {
+          this.modelsLoadError = extractErrorMessage(error, '模型列表加载失败')
+          throw error
+        })
+        .finally(() => {
+          if (this.modelsRequest === request) {
+            this.modelsRequest = null
+          }
+          this.loadingModels = false
+        })
+
+      this.modelsRequest = request
+      return request
+    },
+
+    async fetchHistory(options?: { force?: boolean }) {
+      const force = options?.force ?? false
+
+      if (!force && this.historyRequest) {
+        return this.historyRequest
+      }
+
+      if (!force && isCacheFresh(this.historyLoadedAt)) {
+        this.syncCurrentAssets()
+        return this.history
+      }
+
+      this.loadingHistory = true
+      this.historyLoadError = null
+
+      const request = listAssetHistory()
+        .then((history) => {
+          this.history = ensureArray(history)
+          this.historyLoadedAt = Date.now()
+          this.syncCurrentAssets()
+          return this.history
+        })
+        .catch((error) => {
+          this.historyLoadError = extractErrorMessage(error, '历史记录加载失败')
+          throw error
+        })
+        .finally(() => {
+          if (this.historyRequest === request) {
+            this.historyRequest = null
+          }
+          this.loadingHistory = false
+        })
+
+      this.historyRequest = request
+      return request
+    },
+
+    async refreshTask(taskId: number) {
+      if (this.taskRequests[taskId]) {
+        return this.taskRequests[taskId]
+      }
+
+      this.loadingTask = true
+      this.taskLoadError = null
+
+      const request = (async () => {
+        // 详情与审计并行拉取，保证进度卡片和状态时间线能一起刷新。
+        const [task, auditEvents] = await Promise.all([getTask(taskId), listTaskAuditEvents(taskId)])
+        this.currentTask = task
+        this.currentTaskAudit = ensureArray(auditEvents)
+        if (this.currentTask.status === 'completed') {
+          await this.fetchHistory({ force: true })
+        }
+        return this.currentTask
+      })()
+        .catch((error) => {
+          this.taskLoadError = extractErrorMessage(error, `任务 #${taskId} 加载失败`)
+          throw error
+        })
+        .finally(() => {
+          delete this.taskRequests[taskId]
+          this.loadingTask = Object.keys(this.taskRequests).length > 0
+        })
+
+      this.taskRequests[taskId] = request
+      return request
+    },
+
+    syncCurrentAssets() {
+      if (!this.currentTask) {
+        this.currentAssets = []
+        return
+      }
+      // 当前工作台只展示“当前任务”的资产切片，历史中心再展示完整列表。
+      this.currentAssets = ensureArray(this.history).filter((item) => item.job_id === this.currentTask?.id)
+    },
+
+    async fetchTaskAudit(taskId: number) {
+      this.currentTaskAudit = ensureArray(await listTaskAuditEvents(taskId))
+      return this.currentTaskAudit
+    },
+
+    async fetchAssetDetail(assetId: number) {
+      this.selectedAssetDetail = await getAssetDetail(assetId)
+      return this.selectedAssetDetail
+    },
+  },
+})

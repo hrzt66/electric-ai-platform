@@ -2,5 +2,6 @@ go 1.24.0
 
 use (
 	./services/auth-service
+	./services/model-service
 	./services/platform-common
 )

@@ -30,13 +30,15 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
     </div>
 
     <div v-if="activeAsset" class="image-stage">
-      <el-image
-        class="main-image"
-        :src="buildImageUrl(activeAsset.file_path)"
-        fit="contain"
-        :preview-src-list="assets.map((item) => buildImageUrl(item.file_path))"
-        :initial-index="activeIndex"
-      />
+      <div class="image-frame">
+        <el-image
+          class="main-image"
+          :src="buildImageUrl(activeAsset.file_path)"
+          fit="contain"
+          :preview-src-list="assets.map((item) => buildImageUrl(item.file_path))"
+          :initial-index="activeIndex"
+        />
+      </div>
 
       <div class="meta-row">
         <span>任务 #{{ activeAsset.job_id }}</span>
@@ -64,7 +66,6 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
 
 <style scoped>
 .preview-card {
-  height: 100%;
   min-height: 0;
   padding: 16px;
   border-radius: 22px;
@@ -73,6 +74,7 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  align-self: start;
 }
 
 .preview-header {
@@ -102,21 +104,27 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
 }
 
 .image-stage {
-  flex: 1;
-  min-height: 0;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto auto;
   gap: 10px;
+  align-content: start;
+}
+
+.image-frame {
+  height: clamp(220px, 30vh, 320px);
+  padding: 12px;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 32, 0.02), rgba(15, 23, 32, 0.08)),
+    linear-gradient(45deg, rgba(19, 71, 168, 0.06), rgba(211, 164, 73, 0.12));
 }
 
 .main-image {
   width: 100%;
-  min-height: 0;
-  height: clamp(250px, 36vh, 360px);
-  border-radius: 18px;
-  background:
-    linear-gradient(135deg, rgba(15, 23, 32, 0.02), rgba(15, 23, 32, 0.08)),
-    linear-gradient(45deg, rgba(19, 71, 168, 0.06), rgba(211, 164, 73, 0.12));
+  height: 100%;
+  border-radius: 14px;
+  cursor: zoom-in;
 }
 
 .meta-row {
@@ -159,12 +167,12 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
 }
 
 .preview-empty {
-  flex: 1;
+  min-height: clamp(220px, 30vh, 320px);
 }
 
 :deep(.preview-empty .el-empty) {
   height: 100%;
-  min-height: 220px;
+  min-height: inherit;
 }
 
 :deep(.el-image__wrapper) {

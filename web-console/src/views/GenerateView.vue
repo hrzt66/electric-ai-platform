@@ -271,7 +271,8 @@ onBeforeUnmount(() => {
 .preview-column {
   display: grid;
   gap: 16px;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-content: start;
   min-height: 0;
 }
 

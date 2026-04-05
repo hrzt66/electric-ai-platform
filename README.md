@@ -362,6 +362,7 @@ git push -u origin <当前分支名>
 
 ## 进一步文档
 
-- Windows 原生运行手册：`docs/runtime/windows-native-runbook.md`
-- Docker GPU 运行手册：`docs/runtime/docker-gpu-runbook.md`
-- 迁移执行计划：`docs/superpowers/plans/2026-04-05-legacy-capability-migration.md`
+- [模型介绍、对比与评分说明](docs/models/model-introduction-and-scoring.md)
+- [Windows 原生运行手册](docs/runtime/windows-native-runbook.md)
+- [Docker GPU 运行手册](docs/runtime/docker-gpu-runbook.md)
+- [迁移执行计划](docs/superpowers/plans/2026-04-05-legacy-capability-migration.md)

@@ -4,4 +4,5 @@ use (
 	./services/auth-service
 	./services/model-service
 	./services/platform-common
+	./services/task-service
 )

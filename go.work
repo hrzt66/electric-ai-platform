@@ -4,6 +4,7 @@ use (
 	./services/asset-service
 	./services/audit-service
 	./services/auth-service
+	./services/gateway-service
 	./services/model-service
 	./services/platform-common
 	./services/task-service

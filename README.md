@@ -1,6 +1,19 @@
+<div align="center">
+
 # Electric AI Platform
 
-面向工业电力场景的图像生成与评分平台，采用 `Go 微服务边界 + Python AI 运行时中心 + Vue 3 工作台` 的架构组织方式，支持真实生成、真实评分、任务审计、历史资产回溯以及 Docker / Windows 原生双运行模式。
+面向工业电力场景的图像生成与评分平台
+
+`Go 微服务边界 + Python AI 运行时中心 + Vue 3 工作台`
+
+![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Docker-1f6feb)
+![backend](https://img.shields.io/badge/backend-Go%20Microservices-00ADD8)
+![runtime](https://img.shields.io/badge/runtime-Python%20AI%20Runtime-3776AB)
+![frontend](https://img.shields.io/badge/frontend-Vue%203-42b883)
+
+</div>
+
+面向工业电力场景的图像生成与评分平台，支持真实生成、真实评分、任务审计、历史资产回溯以及 Docker / Windows 原生双运行模式。
 
 当前仓库已经完成以下主链路落地：
 
@@ -8,6 +21,69 @@
 - Python 运行时负责真实模型加载、真实图像生成、真实评分、Redis Stream FIFO 消费和显存释放。
 - 前端工作台负责生成参数配置、实时进度、历史中心、模型中心和任务审计视图。
 - 运行时目录、模型缓存、日志和输出统一落在 `G:\electric-ai-runtime`，便于本机原生与 Docker 共享。
+
+## 发布说明
+
+### 2026 年 4 月 6 日公开版
+
+- 仓库名称统一为 `electric-ai-platform`，默认分支为 `main`。
+- 已完成 `sd15-electric` 与 `unipic2-kontext` 的真实生成接入。
+- 已完成 `ImageReward`、`CLIP-IQA`、`Aesthetic Predictor` 的真实评分接入。
+- 已补齐 Docker 编排、Windows 原生启动脚本、运行手册与 smoke test。
+- 已补充核心代码中文注释、关键 TODO 与面向公开仓库的 README 文档。
+
+### 适用场景
+
+- 工业电力设备图像生成
+- 变电站 / 输电塔 / 电力巡检题材实验
+- 文图一致性与构图质量评估
+- 毕业设计、课程设计、工业 AI 平台原型展示
+
+## 快速开始
+
+### Windows 原生
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/setup-python-runtime.ps1
+powershell -ExecutionPolicy Bypass -File scripts/windows/download-runtime-models.ps1 -All
+powershell -ExecutionPolicy Bypass -File scripts/windows/start-platform.ps1
+powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1
+```
+
+### Docker
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker/up-platform.ps1
+powershell -ExecutionPolicy Bypass -File scripts/docker/download-models.ps1 -Model sd15-electric,unipic2-kontext,image-reward,aesthetic-predictor
+powershell -ExecutionPolicy Bypass -File scripts/docker/smoke-test.ps1 -ModelName unipic2-kontext
+```
+
+## 架构速览
+
+```mermaid
+flowchart LR
+    User["Web Console / GoLand / Docker"] --> Gateway["gateway-service"]
+    Gateway --> Auth["auth-service"]
+    Gateway --> Model["model-service"]
+    Gateway --> Task["task-service"]
+    Gateway --> Asset["asset-service"]
+    Gateway --> Audit["audit-service"]
+    Task --> Redis["Redis Stream"]
+    Redis --> Worker["python-ai-service worker"]
+    Worker --> Runtime["sd15-electric / unipic2-kontext"]
+    Worker --> Score["ImageReward / CLIP-IQA / Aesthetic Predictor"]
+    Worker --> Asset
+    Worker --> Audit
+    Runtime --> Output["G:\\electric-ai-runtime\\outputs"]
+```
+
+## 项目亮点
+
+- 本机原生优先，兼顾 Docker，适合课程设计和真实机器联调。
+- 保持 Go 微服务边界，同时把大模型执行集中在 Python 运行时中心。
+- 任务通过 Redis Stream 以 FIFO 方式流转，便于追踪与补偿。
+- 生成与评分完成后主动释放资源，减少单卡环境下的显存占用。
+- 前端直接展示生成进度、任务审计、模型状态与历史资产。
 
 ## 核心能力
 

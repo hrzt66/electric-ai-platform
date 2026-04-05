@@ -20,6 +20,11 @@ func New(taskController *controller.TaskController) *gin.Engine {
 	v1 := engine.Group("/api/v1")
 	tasks := v1.Group("/tasks")
 	tasks.POST("/generate", taskController.CreateGenerateJob)
+	tasks.GET("", taskController.ListJobs)
+	tasks.GET("/:id", taskController.GetJob)
+
+	internal := engine.Group("/internal")
+	internal.POST("/tasks/:id/status", taskController.UpdateTaskStatus)
 
 	return engine
 }

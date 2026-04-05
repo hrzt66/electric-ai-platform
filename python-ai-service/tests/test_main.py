@@ -23,3 +23,12 @@ def test_generate_returns_file_path_and_scores():
     payload = response.json()["data"]
     assert payload["file_path"].endswith(".png")
     assert payload["scores"]["visual_fidelity"] >= 0
+
+
+def test_runtime_status_returns_directory_probe():
+    response = client.get("/runtime/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["runtime_root"] == r"G:\electric-ai-runtime"
+    assert "directories" in payload

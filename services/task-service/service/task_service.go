@@ -11,9 +11,13 @@ import (
 
 type Job = model.Job
 type CreateGenerateJobInput = model.CreateGenerateJobInput
+type UpdateJobStatusInput = model.UpdateJobStatusInput
 
 type Repository interface {
 	Create(ctx context.Context, job Job) (Job, error)
+	GetByID(ctx context.Context, id int64) (Job, error)
+	List(ctx context.Context) ([]Job, error)
+	UpdateStatus(ctx context.Context, id int64, input UpdateJobStatusInput) (Job, error)
 }
 
 type TaskService struct {
@@ -32,9 +36,13 @@ func (s *TaskService) CreateGenerateJob(ctx context.Context, input CreateGenerat
 	}
 
 	job, err := s.repo.Create(ctx, Job{
-		JobType:     "generate",
-		Status:      "queued",
-		PayloadJSON: string(payload),
+		JobType:        "generate",
+		Status:         "queued",
+		Stage:          "queued",
+		ModelName:      input.ModelName,
+		Prompt:         input.Prompt,
+		NegativePrompt: input.NegativePrompt,
+		PayloadJSON:    string(payload),
 	})
 	if err != nil {
 		return Job{}, err
@@ -51,4 +59,16 @@ func (s *TaskService) CreateGenerateJob(ctx context.Context, input CreateGenerat
 	}
 
 	return job, nil
+}
+
+func (s *TaskService) GetJob(ctx context.Context, id int64) (Job, error) {
+	return s.repo.GetByID(ctx, id)
+}
+
+func (s *TaskService) ListJobs(ctx context.Context) ([]Job, error) {
+	return s.repo.List(ctx)
+}
+
+func (s *TaskService) UpdateStatus(ctx context.Context, id int64, input UpdateJobStatusInput) (Job, error) {
+	return s.repo.UpdateStatus(ctx, id, input)
 }

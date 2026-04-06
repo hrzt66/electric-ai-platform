@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+import sys
 
 from PIL import Image
 
@@ -146,3 +147,134 @@ def test_unipic2_runtime_logs_selected_execution_strategy(tmp_path, caplog):
     messages = "\n".join(record.getMessage() for record in caplog.records)
     assert "applying unipic2 execution strategy cuda=True offload_mode=model" in messages
     assert "enabled unipic2 strategy=model" in messages
+
+
+def test_unipic2_runtime_uses_global_seed_when_offload_enabled(tmp_path, monkeypatch):
+    from app.runtimes.unipic2_runtime import UniPic2Runtime
+
+    created_devices: list[str] = []
+    manual_seed_calls: list[int] = []
+    manual_seed_all_calls: list[int] = []
+
+    class FakeTorchModule:
+        class cuda:
+            @staticmethod
+            def is_available() -> bool:
+                return True
+
+            @staticmethod
+            def manual_seed_all(seed: int) -> None:
+                manual_seed_all_calls.append(seed)
+
+        @staticmethod
+        def manual_seed(seed: int) -> None:
+            manual_seed_calls.append(seed)
+
+        @staticmethod
+        def Generator(device: str):
+            created_devices.append(device)
+            raise AssertionError("offload mode should not create a dedicated CUDA generator")
+
+    monkeypatch.setitem(sys.modules, "torch", FakeTorchModule)
+
+    runtime = UniPic2Runtime(
+        model_dir=tmp_path / "unipic2-kontext",
+        output_dir=tmp_path / "outputs",
+        offload_mode="model",
+    )
+
+    generator = runtime._build_generator(23)
+
+    assert generator is None
+    assert created_devices == []
+    assert manual_seed_calls == [23]
+    assert manual_seed_all_calls == [23]
+
+
+def test_unipic2_runtime_uses_cuda_generator_without_offload(tmp_path, monkeypatch):
+    from app.runtimes.unipic2_runtime import UniPic2Runtime
+
+    created_devices: list[str] = []
+    manual_seed_calls: list[int] = []
+    manual_seed_all_calls: list[int] = []
+
+    class FakeGenerator:
+        def __init__(self, device: str) -> None:
+            self.device = device
+            self.seed: int | None = None
+
+        def manual_seed(self, seed: int):
+            self.seed = seed
+            return self
+
+    class FakeTorchModule:
+        class cuda:
+            @staticmethod
+            def is_available() -> bool:
+                return True
+
+            @staticmethod
+            def manual_seed_all(seed: int) -> None:
+                manual_seed_all_calls.append(seed)
+
+        @staticmethod
+        def manual_seed(seed: int) -> None:
+            manual_seed_calls.append(seed)
+
+        @staticmethod
+        def Generator(device: str):
+            created_devices.append(device)
+            return FakeGenerator(device)
+
+    monkeypatch.setitem(sys.modules, "torch", FakeTorchModule)
+
+    runtime = UniPic2Runtime(
+        model_dir=tmp_path / "unipic2-kontext",
+        output_dir=tmp_path / "outputs",
+        offload_mode="none",
+    )
+
+    generator = runtime._build_generator(99)
+
+    assert created_devices == ["cuda"]
+    assert generator.device == "cuda"
+    assert generator.seed == 99
+    assert manual_seed_calls == []
+    assert manual_seed_all_calls == []
+
+
+def test_unipic2_runtime_unload_runs_stronger_cuda_cleanup(tmp_path, monkeypatch):
+    from app.runtimes.unipic2_runtime import UniPic2Runtime
+
+    cuda_calls: list[str] = []
+
+    class FakeTorchModule:
+        class cuda:
+            @staticmethod
+            def is_available() -> bool:
+                return True
+
+            @staticmethod
+            def synchronize() -> None:
+                cuda_calls.append("synchronize")
+
+            @staticmethod
+            def empty_cache() -> None:
+                cuda_calls.append("empty_cache")
+
+            @staticmethod
+            def ipc_collect() -> None:
+                cuda_calls.append("ipc_collect")
+
+    monkeypatch.setitem(sys.modules, "torch", FakeTorchModule)
+
+    runtime = UniPic2Runtime(
+        model_dir=tmp_path / "unipic2-kontext",
+        output_dir=tmp_path / "outputs",
+        pipeline=object(),
+    )
+
+    runtime.unload()
+
+    assert runtime._pipeline is None
+    assert cuda_calls == ["synchronize", "empty_cache", "ipc_collect"]

@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from app.core.runtime_logging import configure_runtime_logging
+from app.core.torch_cuda import best_effort_cleanup_cuda, seed_global_torch
 from app.runtimes.base import GeneratedImageRecord
 
 configure_runtime_logging()
@@ -220,7 +221,24 @@ class UniPic2Runtime:
         except ImportError:
             return None
 
-        generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu")
+        if torch.cuda.is_available() and self.offload_mode != "none":
+            seed_global_torch(seed)
+            logger.info(
+                "using global torch seed for offloaded unipic2 run seed=%s offload_mode=%s",
+                seed,
+                self.offload_mode,
+            )
+            return None
+
+        target_device = "cuda" if torch.cuda.is_available() else "cpu"
+        try:
+            generator = torch.Generator(device=target_device)
+        except RuntimeError:
+            if target_device != "cuda":
+                raise
+            logger.warning("cuda generator creation failed once, attempting emergency cleanup before retry")
+            best_effort_cleanup_cuda(logger=logger, label="unipic2-generator-retry")
+            generator = torch.Generator(device=target_device)
         generator.manual_seed(seed)
         return generator
 
@@ -231,10 +249,4 @@ class UniPic2Runtime:
             del self._pipeline
             self._pipeline = None
         gc.collect()
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            return
+        best_effort_cleanup_cuda(logger=logger, label="unipic2-unload")

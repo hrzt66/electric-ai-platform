@@ -12,6 +12,7 @@ import torch.nn as nn
 from PIL import Image
 
 from app.core.settings import get_settings
+from app.core.torch_cuda import best_effort_cleanup_cuda
 
 OLD_AESTHETIC_WEIGHT = Path(r"E:\毕业设计\源代码\Project\sac+logos+ava1-l14-linearMSE.pth")
 AESTHETIC_WEIGHT_FILENAME = "sac+logos+ava1-l14-linearMSE.pth"
@@ -137,5 +138,4 @@ class AestheticRuntime:
                 del value
                 setattr(self, attr, None)
         gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        best_effort_cleanup_cuda(label="aesthetic-unload")

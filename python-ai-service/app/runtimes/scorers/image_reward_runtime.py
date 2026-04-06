@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 
 from app.core.settings import get_settings
+from app.core.torch_cuda import best_effort_cleanup_cuda
 
 
 class ImageRewardRuntime:
@@ -69,10 +70,4 @@ class ImageRewardRuntime:
             del self._model
             self._model = None
         gc.collect()
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            return
+        best_effort_cleanup_cuda(label="image-reward-unload")

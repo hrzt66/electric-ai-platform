@@ -6,6 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 import gc
 
+from app.core.torch_cuda import best_effort_cleanup_cuda
 from app.runtimes.base import GeneratedImageRecord
 
 
@@ -114,10 +115,4 @@ class SD15Runtime:
             del self._pipeline
             self._pipeline = None
         gc.collect()
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            return
+        best_effort_cleanup_cuda(label="sd15-unload")

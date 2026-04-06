@@ -8,6 +8,8 @@ from pathlib import Path
 import torch
 from PIL import Image
 
+from app.core.torch_cuda import best_effort_cleanup_cuda
+
 
 class ClipIQARuntime:
     POSITIVE_PROMPTS = {
@@ -102,5 +104,4 @@ class ClipIQARuntime:
                 del value
                 setattr(self, attr, None)
         gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        best_effort_cleanup_cuda(label="clip-iqa-unload")

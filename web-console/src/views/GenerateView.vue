@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 
+import AuditTimeline from '../components/audit/AuditTimeline.vue'
 import GenerationProgressCard from '../components/workbench/GenerationProgressCard.vue'
 import ParameterPanel from '../components/workbench/ParameterPanel.vue'
 import ResultPreview from '../components/workbench/ResultPreview.vue'
@@ -233,14 +234,7 @@ onBeforeUnmount(() => {
             />
 
             <div class="status-content">
-              <el-empty v-if="platformStore.currentTaskAudit.length === 0" description="当前还没有可展示的审计事件。" />
-
-              <el-timeline v-else>
-                <el-timeline-item v-for="event in platformStore.currentTaskAudit" :key="event.id" :timestamp="event.created_at" placement="top">
-                  <strong>{{ event.event_type }}</strong>
-                  <p class="timeline-body">{{ event.payload_json || event.message || '无附加信息' }}</p>
-                </el-timeline-item>
-              </el-timeline>
+              <AuditTimeline :events="platformStore.currentTaskAudit" empty-description="当前还没有可展示的审计事件。" />
             </div>
           </template>
         </section>
@@ -334,14 +328,6 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: auto;
   padding-right: 4px;
-}
-
-.timeline-body {
-  margin: 4px 0 0;
-  color: #53606f;
-  word-break: break-all;
-  font-size: 0.84rem;
-  line-height: 1.45;
 }
 
 @media (min-width: 981px) {

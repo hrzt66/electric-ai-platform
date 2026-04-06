@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import AuditTimeline from '../audit/AuditTimeline.vue'
 import { buildImageUrl } from '../../api/platform'
 import type { AssetDetail, AuditEvent } from '../../types/platform'
 
@@ -61,12 +62,7 @@ const scores = computed(() => {
 
       <section class="audit">
         <div class="section-title">任务审计轨迹</div>
-        <el-timeline>
-          <el-timeline-item v-for="event in auditEvents" :key="event.id" :timestamp="event.created_at" placement="top">
-            <strong>{{ event.event_type }}</strong>
-            <p class="audit-payload">{{ event.payload_json || event.message || '无附加信息' }}</p>
-          </el-timeline-item>
-        </el-timeline>
+        <AuditTimeline :events="auditEvents" empty-description="当前没有可展示的审计事件。" />
       </section>
     </div>
   </el-drawer>
@@ -137,12 +133,6 @@ const scores = computed(() => {
 .section-title {
   font-weight: 700;
   color: #17202b;
-}
-
-.audit-payload {
-  margin: 6px 0 0;
-  color: #53606f;
-  word-break: break-all;
 }
 
 @media (max-width: 760px) {

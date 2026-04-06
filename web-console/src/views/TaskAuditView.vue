@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
+import AuditTimeline from '../components/audit/AuditTimeline.vue'
 import { usePlatformStore } from '../stores/platform'
 import { resolveAuditTaskId } from './task-audit-utils'
 
@@ -117,13 +118,7 @@ watch(
           <div class="panel-header">
             <h3>时间线</h3>
           </div>
-          <el-empty v-if="platformStore.currentTaskAudit.length === 0" description="当前没有可展示的审计事件。" />
-          <el-timeline v-else>
-            <el-timeline-item v-for="event in platformStore.currentTaskAudit" :key="event.id" :timestamp="event.created_at" placement="top">
-              <strong>{{ event.event_type }}</strong>
-              <p class="timeline-body">{{ event.payload_json || event.message || '无附加信息' }}</p>
-            </el-timeline-item>
-          </el-timeline>
+          <AuditTimeline :events="platformStore.currentTaskAudit" empty-description="当前没有可展示的审计事件。" />
         </div>
 
         <div class="panel">
@@ -173,7 +168,6 @@ watch(
 
 .summary-eyebrow,
 .summary-title,
-.timeline-body,
 .asset-item p {
   margin: 0;
 }
@@ -205,7 +199,6 @@ watch(
   margin: 0;
 }
 
-.timeline-body,
 .asset-item p {
   color: #53606f;
 }

@@ -10,5 +10,6 @@ describe('app shell mobile chrome', () => {
     expect(content).toContain('menu-button')
     expect(content).toContain('mobile-nav')
     expect(content).toContain('el-drawer')
+    expect(content).toContain('topbar-status-dot')
   })
 })

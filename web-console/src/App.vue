@@ -15,6 +15,9 @@
   --ea-accent: #d3a449;
   --ea-border: rgba(15, 23, 32, 0.08);
   --ea-shadow: 0 18px 36px rgba(15, 23, 32, 0.08);
+  --ea-mobile-card-radius: 14px;
+  --ea-mobile-card-padding: 12px;
+  --ea-mobile-card-shadow: 0 8px 18px rgba(15, 23, 32, 0.08);
 }
 
 html,
@@ -53,7 +56,7 @@ a {
 
 @media (max-width: 768px) {
   body {
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 }
 </style>

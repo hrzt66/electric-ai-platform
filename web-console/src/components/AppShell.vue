@@ -108,12 +108,17 @@ onBeforeUnmount(() => {
           </button>
 
           <div>
-            <p class="eyebrow">本机原生运行时</p>
+            <p v-if="!isMobile" class="eyebrow">本机原生运行时</p>
             <h1 class="page-title">{{ currentTitle }}</h1>
           </div>
         </div>
 
-        <div class="topbar-badge">
+        <div v-if="isMobile" class="topbar-status">
+          <span class="topbar-status-dot" />
+          <span class="topbar-status-text">在线</span>
+        </div>
+
+        <div v-else class="topbar-badge">
           <span class="badge-dot" />
           Go 微服务边界 / Python 模型中心 / 实时审计
         </div>
@@ -176,8 +181,10 @@ onBeforeUnmount(() => {
         :disabled="item.path === activePath || navigating"
         @click="go(item.path)"
       >
-        <span class="mobile-nav-label">{{ item.label }}</span>
-        <span class="mobile-nav-hint">{{ item.hint }}</span>
+        <span class="mobile-nav-text">
+          <span class="mobile-nav-label">{{ item.label }}</span>
+          <span class="mobile-nav-hint">{{ item.hint }}</span>
+        </span>
       </button>
     </nav>
   </div>
@@ -414,6 +421,24 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
+.topbar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #f8fafc;
+  font-size: 0.76rem;
+}
+
+.topbar-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #0f9d58;
+}
+
 .topbar-badge {
   display: inline-flex;
   align-items: center;
@@ -477,6 +502,12 @@ onBeforeUnmount(() => {
   border-color: rgba(211, 164, 73, 0.35);
 }
 
+.mobile-nav-text {
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+}
+
 .mobile-nav-label {
   font-size: 0.76rem;
   font-weight: 600;
@@ -497,24 +528,35 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
-  .topbar-badge {
-    width: 100%;
-    justify-content: center;
+  .topbar-mobile {
+    padding: 10px 14px 8px;
+    gap: 8px;
+  }
+
+  .page-title {
+    font-size: 1.18rem;
+    line-height: 1.1;
+  }
+
+  .menu-button {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .mobile-nav {
+    gap: 4px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-nav-item {
+    min-height: 40px;
+    padding: 6px 2px;
+    border-radius: 12px;
   }
 
   .main {
     padding: 0 12px 12px;
-  }
-}
-
-@media (max-width: 520px) {
-  .mobile-nav {
-    gap: 6px;
-    padding-inline: 8px;
-  }
-
-  .mobile-nav-item {
-    padding-inline: 4px;
   }
 
   .mobile-nav-label {
@@ -522,7 +564,7 @@ onBeforeUnmount(() => {
   }
 
   .mobile-nav-hint {
-    font-size: 0.58rem;
+    display: none;
   }
 }
 </style>

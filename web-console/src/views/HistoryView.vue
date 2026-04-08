@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
 import HistoryDetailDrawer from '../components/history/HistoryDetailDrawer.vue'
 import HistoryFilters from '../components/history/HistoryFilters.vue'
@@ -10,7 +10,9 @@ const platformStore = usePlatformStore()
 const drawerVisible = ref(false)
 const historyLoading = ref(false)
 const historyError = ref('')
-const filtersExpanded = ref(true)
+const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const isMobile = computed(() => viewportWidth.value <= 768)
+const filtersExpanded = ref(!isMobile.value)
 
 const filters = reactive({
   promptKeyword: '',
@@ -62,8 +64,20 @@ async function loadHistoryPage() {
   }
 }
 
+function syncViewport() {
+  viewportWidth.value = window.innerWidth
+  if (!isMobile.value) {
+    filtersExpanded.value = true
+  }
+}
+
 onMounted(() => {
+  window.addEventListener('resize', syncViewport)
   void loadHistoryPage()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncViewport)
 })
 </script>
 
@@ -92,5 +106,11 @@ onMounted(() => {
   padding: 24px;
   background: #ffffff;
   box-shadow: var(--ea-shadow);
+}
+
+@media (max-width: 768px) {
+  .history-page {
+    gap: 10px;
+  }
 }
 </style>

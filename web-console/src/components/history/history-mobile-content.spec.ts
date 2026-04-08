@@ -10,6 +10,7 @@ describe('history mobile layout', () => {
     const drawer = readFileSync(resolve(__dirname, './HistoryDetailDrawer.vue'), 'utf8')
 
     expect(table).toContain('history-cards')
+    expect(table).toContain('history-card--compact')
     expect(table).toContain('v-if="isMobile"')
     expect(filters).toContain('filters-toggle')
     expect(drawer).toContain('drawerSize')

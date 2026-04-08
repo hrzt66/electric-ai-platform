@@ -18,7 +18,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section class="filters">
+  <section class="filters filters--compact">
     <div class="filters-header">
       <div>
         <p class="filters-eyebrow">历史检索</p>
@@ -116,6 +116,20 @@ const emit = defineEmits<{
 }
 
 @media (max-width: 768px) {
+  .filters--compact {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
+  .filters-title {
+    font-size: 1rem;
+  }
+
+  .filters-header {
+    margin-bottom: 10px;
+  }
+
   .filters-header,
   .filters-actions {
     flex-direction: column;

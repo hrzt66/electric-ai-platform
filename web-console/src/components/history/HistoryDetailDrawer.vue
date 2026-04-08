@@ -62,7 +62,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div v-if="detail" class="drawer-body">
+    <div v-if="detail" class="drawer-body drawer-body--compact">
       <el-image class="drawer-image" :src="buildImageUrl(detail.asset.file_path)" fit="cover" :preview-src-list="[buildImageUrl(detail.asset.file_path)]" />
 
       <el-descriptions :column="1" border class="drawer-descriptions">
@@ -211,16 +211,26 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
+  .drawer-body--compact {
+    gap: 12px;
+  }
+
   .drawer-header {
     flex-direction: column;
   }
 
   .drawer-image {
-    min-height: 220px;
+    min-height: 180px;
+    border-radius: 14px;
   }
 
   .score-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .score-chip {
+    padding: 10px;
+    border-radius: 12px;
   }
 }
 

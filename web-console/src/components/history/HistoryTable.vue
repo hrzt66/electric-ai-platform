@@ -41,7 +41,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="isMobile" class="history-cards">
-      <article v-for="row in props.items" :key="row.id" class="history-card" @click="emit('open', row)">
+      <article v-for="row in props.items" :key="row.id" class="history-card history-card--compact" @click="emit('open', row)">
         <img class="thumb history-card__thumb" :src="buildImageUrl(row.file_path)" :alt="row.image_name" />
         <div class="history-card__body">
           <strong>{{ row.image_name }}</strong>
@@ -188,14 +188,39 @@ onBeforeUnmount(() => {
   .table-header {
     flex-direction: column;
   }
+}
 
-  .history-card {
-    grid-template-columns: 1fr;
+@media (max-width: 768px) {
+  .table-card {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
+  .history-card--compact {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+    border-radius: 12px;
   }
 
   .history-card__thumb {
-    width: 100%;
-    height: 180px;
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+  }
+
+  .history-card__body {
+    gap: 4px;
+  }
+
+  .history-card__body p {
+    display: none;
+  }
+
+  .history-card__meta {
+    gap: 4px 8px;
+    font-size: 0.74rem;
   }
 }
 </style>

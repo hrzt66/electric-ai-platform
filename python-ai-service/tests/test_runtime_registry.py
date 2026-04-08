@@ -51,6 +51,20 @@ def test_runtime_registry_builds_sd15_runtime_from_settings(tmp_path):
     assert runtime.model_dir == tmp_path / "models" / "generation" / "sd15-electric"
 
 
+def test_runtime_registry_builds_specialized_sd15_runtime_from_settings(tmp_path):
+    from app.core.settings import Settings
+    from app.runtimes.runtime_registry import RuntimeRegistry
+    from app.runtimes.sd15_runtime import SD15Runtime
+
+    settings = Settings(runtime_root=tmp_path)
+    registry = RuntimeRegistry(settings=settings)
+
+    runtime = registry.get_generation_runtime("sd15-electric-specialized")
+
+    assert isinstance(runtime, SD15Runtime)
+    assert runtime.model_dir == tmp_path / "models" / "generation" / "sd15-electric-specialized"
+
+
 def test_runtime_registry_builds_unipic2_runtime_from_settings(tmp_path):
     from app.core.settings import Settings
     from app.runtimes.runtime_registry import RuntimeRegistry
@@ -151,3 +165,21 @@ def test_runtime_registry_logs_runtime_switch_and_release(tmp_path, caplog):
     assert "building generation runtime model=sd15-electric" in messages
     assert "switching generation runtime from=sd15-electric to=unipic2-kontext" in messages
     assert "releasing generation runtime model=unipic2-kontext" in messages
+
+
+def test_runtime_registry_lists_specialized_sd15_model(tmp_path):
+    from app.core.settings import Settings
+    from app.runtimes.runtime_registry import RuntimeRegistry
+
+    generation_dir = tmp_path / "models" / "generation" / "sd15-electric-specialized"
+    generation_dir.mkdir(parents=True)
+    (generation_dir / "model_index.json").write_text("{}", encoding="utf-8")
+
+    settings = Settings(runtime_root=tmp_path)
+    registry = RuntimeRegistry(settings=settings)
+
+    items = registry.list_models()["items"]
+    specialized = next(item for item in items if item["name"] == "sd15-electric-specialized")
+
+    assert specialized["status"] == "available"
+    assert Path(specialized["local_dir"]) == generation_dir

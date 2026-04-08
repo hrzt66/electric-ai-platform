@@ -116,3 +116,27 @@ def test_settings_read_runtime_tuning_flags_from_env(monkeypatch, tmp_path):
     assert settings.runtime_root == tmp_path / "runtime"
     assert settings.unipic2_offload_mode == "none"
     assert settings.scoring_release_after_batch is False
+
+
+def test_settings_reads_dotenv_local_from_working_directory(monkeypatch, tmp_path):
+    from app.core.settings import Settings
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.delenv("TASK_SERVICE_BASE_URL", raising=False)
+
+    env_file = tmp_path / ".env.local"
+    env_file.write_text(
+        "\n".join(
+            [
+                "REDIS_URL=redis://127.0.0.1:6380/0",
+                "TASK_SERVICE_BASE_URL=http://127.0.0.1:8083",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    settings = Settings.from_env()
+
+    assert settings.redis_url == "redis://127.0.0.1:6380/0"
+    assert settings.task_service_base_url == "http://127.0.0.1:8083"

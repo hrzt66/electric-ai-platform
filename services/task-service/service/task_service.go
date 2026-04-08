@@ -30,19 +30,24 @@ func NewTaskService(repo Repository, rdb *redis.Client) *TaskService {
 }
 
 func (s *TaskService) CreateGenerateJob(ctx context.Context, input CreateGenerateJobInput) (Job, error) {
+	if input.ScoringModelName == "" {
+		input.ScoringModelName = "electric-score-v1"
+	}
+
 	payload, err := json.Marshal(input)
 	if err != nil {
 		return Job{}, err
 	}
 
 	job, err := s.repo.Create(ctx, Job{
-		JobType:        "generate",
-		Status:         "queued",
-		Stage:          "queued",
-		ModelName:      input.ModelName,
-		Prompt:         input.Prompt,
-		NegativePrompt: input.NegativePrompt,
-		PayloadJSON:    string(payload),
+		JobType:          "generate",
+		Status:           "queued",
+		Stage:            "queued",
+		ModelName:        input.ModelName,
+		ScoringModelName: input.ScoringModelName,
+		Prompt:           input.Prompt,
+		NegativePrompt:   input.NegativePrompt,
+		PayloadJSON:      string(payload),
 	})
 	if err != nil {
 		return Job{}, err

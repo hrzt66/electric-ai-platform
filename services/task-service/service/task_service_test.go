@@ -58,12 +58,16 @@ func TestCreateGenerateJobStoresJobAndPublishesToRedis(t *testing.T) {
 		Prompt:         "A wind turbine farm at sunset",
 		NegativePrompt: "blurry",
 		ModelName:      "UniPic-2",
+		ScoringModelName: "electric-score-v2",
 	})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 	if job.Status != "queued" {
 		t.Fatalf("expected queued status, got %s", job.Status)
+	}
+	if job.ScoringModelName != "electric-score-v2" {
+		t.Fatalf("expected scoring model name to persist, got %s", job.ScoringModelName)
 	}
 	if mr.Exists("stream:generate:jobs") == false {
 		t.Fatal("expected stream entry")
@@ -80,6 +84,7 @@ func TestGetJobReturnsStoredRecord(t *testing.T) {
 		Prompt:         "500kV substation",
 		NegativePrompt: "blurry",
 		ModelName:      "sd15-electric",
+		ScoringModelName: "electric-score-v1",
 	})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -91,6 +96,9 @@ func TestGetJobReturnsStoredRecord(t *testing.T) {
 	}
 	if job.ModelName != "sd15-electric" {
 		t.Fatalf("expected model name to be persisted, got %s", job.ModelName)
+	}
+	if job.ScoringModelName != "electric-score-v1" {
+		t.Fatalf("expected scoring model name to be persisted, got %s", job.ScoringModelName)
 	}
 	if job.Stage != "queued" {
 		t.Fatalf("expected stage queued, got %s", job.Stage)
@@ -107,6 +115,7 @@ func TestUpdateStatusWritesStageAndErrorMessage(t *testing.T) {
 		Prompt:         "inspection drone over power line",
 		NegativePrompt: "artifact",
 		ModelName:      "sd15-electric",
+		ScoringModelName: "electric-score-v2",
 	})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)

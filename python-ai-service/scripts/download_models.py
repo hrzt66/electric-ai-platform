@@ -52,6 +52,13 @@ def get_model_manifest(settings: Settings | None = None) -> dict[str, dict[str, 
             local_dir=str(paths.models_generation / "sd15-electric"),
             description="Stable Diffusion 1.5 baseline runtime",
         ),
+        "sd15-electric-specialized": RuntimeModelManifestEntry(
+            name="sd15-electric-specialized",
+            target="generation",
+            source="local-runtime",
+            local_dir=str(paths.models_generation / "sd15-electric-specialized"),
+            description="Electric-domain specialized SD1.5 deployment model",
+        ),
         "unipic2-kontext": RuntimeModelManifestEntry(
             name="unipic2-kontext",
             target="generation",
@@ -172,6 +179,13 @@ def execute_download_plan(selected_models: list[str], check_only: bool = False) 
 
         if entry["source"] == "local-copy":
             results[model_name] = _copy_local_weight(entry)
+            continue
+
+        if entry["source"] == "local-runtime":
+            results[model_name] = {
+                "status": "present" if local_dir.exists() and any(local_dir.iterdir()) else "missing",
+                "local_dir": str(local_dir),
+            }
             continue
 
         results[model_name] = _download_huggingface(entry)

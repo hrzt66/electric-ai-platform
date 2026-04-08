@@ -67,6 +67,47 @@ describe('platform store', () => {
     expect(store.currentTask?.status).toBe('queued')
   })
 
+  it('submits the requested scoring model name with the generation job payload', async () => {
+    const { usePlatformStore } = await import('./platform')
+    const store = usePlatformStore()
+    const createdTask: GenerateTask = {
+      id: 10,
+      job_type: 'generate',
+      status: 'queued',
+      stage: 'queued',
+      error_message: '',
+      model_name: 'sd15-electric',
+      scoring_model_name: 'electric-score-v2',
+      prompt: 'substation',
+      negative_prompt: 'blurry',
+      payload_json: '{}',
+      created_at: '2026-04-05T16:00:00+08:00',
+      updated_at: '2026-04-05T16:00:00+08:00',
+    }
+
+    api.createGenerateTask.mockResolvedValue(createdTask)
+
+    await store.submitGenerateJob({
+      prompt: 'substation',
+      negative_prompt: 'blurry',
+      model_name: 'sd15-electric',
+      scoring_model_name: 'electric-score-v2',
+      seed: 1,
+      steps: 12,
+      guidance_scale: 7,
+      width: 512,
+      height: 512,
+      num_images: 1,
+    } satisfies GenerateTaskRequest)
+
+    expect(api.createGenerateTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scoring_model_name: 'electric-score-v2',
+      }),
+    )
+    expect(store.currentTask?.scoring_model_name).toBe('electric-score-v2')
+  })
+
   it('hydrates current assets from history when the task completes', async () => {
     const { usePlatformStore } = await import('./platform')
     const store = usePlatformStore()

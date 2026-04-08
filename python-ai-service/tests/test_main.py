@@ -38,7 +38,11 @@ class FakeGenerationService:
 
 
 class FakeScoringService:
+    def __init__(self) -> None:
+        self.last_scoring_model_name = None
+
     def score_batch(self, job, images):
+        self.last_scoring_model_name = job.scoring_model_name
         return [
             {
                 **images[0],
@@ -55,11 +59,12 @@ class FakeScoringService:
 def test_internal_generate_uses_runtime_registry_and_real_services():
     from app.main import create_app
 
+    scoring_service = FakeScoringService()
     client = TestClient(
         create_app(
             runtime_registry=FakeRuntimeRegistry(),
             generation_service=FakeGenerationService(),
-            scoring_service=FakeScoringService(),
+            scoring_service=scoring_service,
         )
     )
 
@@ -70,6 +75,7 @@ def test_internal_generate_uses_runtime_registry_and_real_services():
             "prompt": "A wind turbine farm at sunset",
             "negative_prompt": "blurry",
             "model_name": "sd15-electric",
+            "scoring_model_name": "electric-score-v2",
             "seed": 42,
             "steps": 20,
             "guidance_scale": 7.5,
@@ -83,6 +89,7 @@ def test_internal_generate_uses_runtime_registry_and_real_services():
     payload = response.json()["data"]
     assert payload["results"][0]["file_path"].endswith("_0_42.png")
     assert payload["results"][0]["total_score"] == 77.0
+    assert scoring_service.last_scoring_model_name == "electric-score-v2"
 
 
 def test_runtime_endpoints_delegate_to_runtime_registry():
@@ -129,3 +136,60 @@ def test_internal_generate_keeps_runtime_loaded_for_following_jobs():
 
     assert response.status_code == 200
     assert runtime_registry.runtime.unload_calls == 0
+
+
+def test_create_app_builds_default_dependencies_lazily(monkeypatch):
+    import app.main as main
+
+    calls: list[str] = []
+
+    def fake_registry():
+        calls.append("registry")
+        return FakeRuntimeRegistry()
+
+    def fake_generator():
+        calls.append("generator")
+        return FakeGenerationService()
+
+    def fake_scorer(*, release_after_batch=False):
+        calls.append(f"scorer:{release_after_batch}")
+        return FakeScoringService()
+
+    monkeypatch.setattr(main, "build_runtime_registry", fake_registry)
+    monkeypatch.setattr(main, "build_generation_service", fake_generator)
+    monkeypatch.setattr(main, "build_scoring_service", fake_scorer)
+
+    app = main.create_app()
+    client = TestClient(app)
+
+    assert calls == []
+
+    health_response = client.get("/health")
+
+    assert health_response.status_code == 200
+    assert calls == []
+
+    status_response = client.get("/runtime/status")
+
+    assert status_response.status_code == 200
+    assert calls == ["registry"]
+
+    generate_response = client.post(
+        "/internal/generate",
+        json={
+            "job_id": 3,
+            "prompt": "A wind turbine farm at sunset",
+            "negative_prompt": "blurry",
+            "model_name": "sd15-electric",
+            "scoring_model_name": "electric-score-v2",
+            "seed": 42,
+            "steps": 20,
+            "guidance_scale": 7.5,
+            "width": 512,
+            "height": 512,
+            "num_images": 1,
+        },
+    )
+
+    assert generate_response.status_code == 200
+    assert calls == ["registry", "generator", "scorer:False"]

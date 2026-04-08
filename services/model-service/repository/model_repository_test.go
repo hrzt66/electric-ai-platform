@@ -57,4 +57,7 @@ func TestModelInitScriptsKeepRegistrySeedIdempotent(t *testing.T) {
 	if !strings.Contains(seed, "ON DUPLICATE KEY UPDATE") {
 		t.Fatal("expected seed script to upsert model registry records")
 	}
+	if !strings.Contains(seed, "electric-score-v2") {
+		t.Fatal("expected seed script to register the self-trained scoring model")
+	}
 }

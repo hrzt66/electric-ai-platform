@@ -149,6 +149,39 @@ def test_unipic2_runtime_logs_selected_execution_strategy(tmp_path, caplog):
     assert "enabled unipic2 strategy=model" in messages
 
 
+def test_unipic2_runtime_uses_low_cpu_mem_loading_when_cuda_is_available(tmp_path):
+    from app.runtimes.unipic2_runtime import UniPic2Runtime
+
+    runtime = UniPic2Runtime(
+        model_dir=tmp_path / "unipic2-kontext",
+        output_dir=tmp_path / "outputs",
+        offload_mode="model",
+    )
+
+    kwargs = runtime._model_load_kwargs(dtype="float16", cuda_available=True)
+
+    assert kwargs["torch_dtype"] == "float16"
+    assert kwargs["local_files_only"] is True
+    assert kwargs["low_cpu_mem_usage"] is True
+
+
+def test_unipic2_runtime_skips_low_cpu_mem_flag_without_cuda(tmp_path):
+    from app.runtimes.unipic2_runtime import UniPic2Runtime
+
+    runtime = UniPic2Runtime(
+        model_dir=tmp_path / "unipic2-kontext",
+        output_dir=tmp_path / "outputs",
+        offload_mode="model",
+    )
+
+    kwargs = runtime._model_load_kwargs(dtype="float32", cuda_available=False)
+
+    assert kwargs == {
+        "torch_dtype": "float32",
+        "local_files_only": True,
+    }
+
+
 def test_unipic2_runtime_uses_global_seed_when_offload_enabled(tmp_path, monkeypatch):
     from app.runtimes.unipic2_runtime import UniPic2Runtime
 

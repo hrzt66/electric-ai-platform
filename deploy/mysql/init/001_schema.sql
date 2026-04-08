@@ -40,6 +40,7 @@ CREATE TABLE task_jobs (
     status VARCHAR(32) NOT NULL,
     stage VARCHAR(32) NOT NULL DEFAULT 'queued',
     model_name VARCHAR(128) NOT NULL,
+    scoring_model_name VARCHAR(128) NOT NULL DEFAULT 'electric-score-v1',
     prompt TEXT NULL,
     negative_prompt TEXT NULL,
     payload_json LONGTEXT NOT NULL,

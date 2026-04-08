@@ -13,7 +13,7 @@ class RuntimeDirectoryState(BaseModel):
 class RuntimeModelManifestEntry(BaseModel):
     name: str
     target: Literal["generation", "scoring"]
-    source: Literal["huggingface", "local-copy"]
+    source: Literal["huggingface", "local-copy", "local-runtime"]
     repo_id: str | None = None
     local_source: str | None = None
     local_dir: str

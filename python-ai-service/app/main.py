@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""FastAPI 入口，提供健康检查、运行时探针和内部生成接口。"""
+"""FastAPI entrypoint for health checks, runtime probes and internal generation."""
 
 from fastapi import FastAPI
 
@@ -9,35 +9,48 @@ from app.schemas.jobs import GenerateJob
 
 
 def create_app(*, runtime_registry=None, generation_service=None, scoring_service=None) -> FastAPI:
-    """允许测试时注入假实现，线上则装配真实运行时与评分服务。"""
-    registry = runtime_registry or build_runtime_registry()
-    generator = generation_service or build_generation_service()
-    scorer = scoring_service or build_scoring_service(release_after_batch=False)
+    """Create the app while lazily constructing heavyweight runtime dependencies."""
+    registry = runtime_registry
+    generator = generation_service
+    scorer = scoring_service
+
+    def get_registry():
+        nonlocal registry
+        if registry is None:
+            registry = build_runtime_registry()
+        return registry
+
+    def get_generator():
+        nonlocal generator
+        if generator is None:
+            generator = build_generation_service()
+        return generator
+
+    def get_scorer():
+        nonlocal scorer
+        if scorer is None:
+            scorer = build_scoring_service(release_after_batch=False)
+        return scorer
 
     app = FastAPI(title="python-ai-service")
 
     @app.get("/health")
     def health() -> dict:
-        """返回基础健康状态，供网关和脚本探活使用。"""
         return {"status": "ok"}
 
     @app.get("/runtime/status")
     def runtime_status() -> dict:
-        """返回 Python 运行时探针报告，包括包依赖、CUDA 与模型状态。"""
-        return registry.build_status()
+        return get_registry().build_status()
 
     @app.get("/runtime/models")
     def runtime_models() -> dict:
-        """返回模型中心使用的模型清单。"""
-        return registry.list_models()
+        return get_registry().list_models()
 
     @app.post("/internal/generate")
     def generate(request: GenerateJob) -> dict:
-        """在 API 模式下同步执行生成与评分，并直接返回结果。"""
-        # API 模式会直接在请求线程内执行生成和评分，适合 smoke test 与链路联调。
-        runtime = registry.get_generation_runtime(request.model_name)
-        generated_images = generator.generate(request, runtime)
-        scored_results = scorer.score_batch(request, generated_images)
+        runtime = get_registry().get_generation_runtime(request.model_name)
+        generated_images = get_generator().generate(request, runtime)
+        scored_results = get_scorer().score_batch(request, generated_images)
         return {
             "code": 0,
             "message": "success",
@@ -51,5 +64,4 @@ def create_app(*, runtime_registry=None, generation_service=None, scoring_servic
     return app
 
 
-# 创建默认 FastAPI 应用实例，供 uvicorn 直接导入启动。
 app = create_app()

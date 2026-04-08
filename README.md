@@ -2,7 +2,7 @@
 
 # Electric AI Platform
 
-面向工业电力场景的图像生成与评分平台
+面向工业电力场景的图像生成与多维质量评价平台
 
 `Go 微服务边界 + Python AI 运行时中心 + Vue 3 工作台`
 
@@ -13,58 +13,81 @@
 
 </div>
 
-面向工业电力场景的图像生成与评分平台，支持真实生成、真实评分、任务审计、历史资产回溯以及 Docker / Windows 原生双运行模式。
+本项目是一个围绕“电力行业图像生成 + 多维质量评价”展开的毕业设计平台。系统采用 Go 微服务承载平台治理与业务编排，采用 Python 运行时承载真实生成与真实评分模型，前端使用 Vue 3 提供统一工作台，支持 Windows 原生与 Docker GPU 两种运行方式。
 
-## 最终设计文档
+平台目标不是单独生成一张图片，而是形成完整闭环：
 
-- 统一最终版设计文档：`docs/final-design.md`
+- 根据电力行业 Prompt 生成图像
+- 对生成结果进行四维质量评价
+- 记录任务生命周期与审计事件
+- 在历史中心查看结果、评分和详情
+- 在模型中心管理生成模型与评分模型
+- 通过脚本完成本机原生或 Docker GPU 运行
 
-本仓库此前位于 `docs/superpowers/` 下的阶段性设计稿与实现计划已完成收敛，正式设计入口只保留这一份最终文档。
+## 文档导航
 
-当前仓库已经完成以下主链路落地：
+- 模型介绍、对比与评分说明：[docs/model-introduction-and-scoring.md](docs/model-introduction-and-scoring.md)
+- 模型训练与使用说明：[docs/model-training-and-usage.md](docs/model-training-and-usage.md)
+- 项目函数说明：[docs/project-function-reference.md](docs/project-function-reference.md)
+- Windows 原生运行手册：[docs/windows-native-runbook.md](docs/windows-native-runbook.md)
+- Docker GPU 运行手册：[docs/docker-gpu-runbook.md](docs/docker-gpu-runbook.md)
 
-- Go 微服务负责登录鉴权、模型目录、任务编排、资产落库、审计追踪和统一网关。
-- Python 运行时负责真实模型加载、真实图像生成、真实评分、Redis Stream FIFO 消费和显存释放。
-- 前端工作台负责生成参数配置、实时进度、历史中心、模型中心和任务审计视图。
-- 运行时目录、模型缓存、日志和输出统一落在 `G:\electric-ai-runtime`，便于本机原生与 Docker 共享。
+## 项目亮点
 
-## 发布说明
+- 微服务边界清晰：网关、认证、模型、任务、资产、审计分域明确。
+- 真实模型链路：不是纯 mock，而是接入了真实生成模型和真实评分模型。
+- 评分维度完整：围绕视觉保真、文本一致、物理合理、构图美学四个维度输出结果。
+- 单机友好：针对 `RTX 3060 Laptop GPU 6GB` 这一类单卡环境做了模型加载、释放和运行策略优化。
+- 双运行形态：既支持 Windows 原生调试，也支持 Docker GPU 编排。
+- 前端可展示：提供登录页、生成工作台、历史中心、模型中心、任务审计等完整界面。
 
-### 2026 年 4 月 6 日公开版
+## 核心能力
 
-- 仓库名称统一为 `electric-ai-platform`，默认分支为 `main`。
-- 已完成 `sd15-electric` 与 `unipic2-kontext` 的真实生成接入。
-- 已完成 `ImageReward`、`CLIP-IQA`、`Aesthetic Predictor` 的真实评分接入。
-- 已补齐 Docker 编排、Windows 原生启动脚本、运行手册与 smoke test。
-- 已补充核心代码中文注释、关键 TODO 与面向公开仓库的 README 文档。
+- 电力场景图像生成
+- 多模型切换与参数控制
+- 图像四维质量评分
+- 历史结果分页查询与详情回看
+- 任务状态跟踪与审计事件展示
+- 模型中心状态探测
+- 输出图片落盘与统一访问
 
-### 适用场景
+## 当前模型体系
 
-- 工业电力设备图像生成
-- 变电站 / 输电塔 / 电力巡检题材实验
-- 文图一致性与构图质量评估
-- 毕业设计、课程设计、工业 AI 平台原型展示
+### 生成模型
 
-## 快速开始
+- `sd15-electric`
+  当前默认主力生成模型，启动稳定，适合日常联调和标准电力场景出图。
+- `sd15-electric-specialized`
+  面向电力行业进一步专用化的 SD1.5 路线模型，适合强调行业专属性的实验与展示。
+- `unipic2-kontext`
+  更偏高质量语义理解的生成模型，适合复杂 Prompt 和最终展示图。
 
-### Windows 原生
+### 评分模型
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/windows/setup-python-runtime.ps1
-powershell -ExecutionPolicy Bypass -File scripts/windows/download-runtime-models.ps1 -All
-powershell -ExecutionPolicy Bypass -File scripts/windows/start-platform.ps1
-powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1
-```
+- `electric-score-v1`
+  默认评分模型，采用多运行时组合方式完成四维评分。
+- `electric-score-v2`
+  自训练评分模型路线，支持独立 bundle 推理。
+- `electric-score-v3`
+  进一步演进的自训练评分模型路线，支持更强的行业约束与混合评分思路。
 
-### Docker
+### 底层评分组件
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/docker/up-platform.ps1
-powershell -ExecutionPolicy Bypass -File scripts/docker/download-models.ps1 -Model sd15-electric,unipic2-kontext,image-reward,aesthetic-predictor
-powershell -ExecutionPolicy Bypass -File scripts/docker/smoke-test.ps1 -ModelName unipic2-kontext
-```
+- `ImageReward`
+  负责文本一致性等更接近人类偏好的图文匹配判断。
+- `CLIP-IQA`
+  负责视觉保真和物理合理性等基础评分能力。
+- `Aesthetic Predictor`
+  负责构图美学维度评分。
+- `Power Score Runtime`
+  平台内部用于承载自训练评分模型与混合评分逻辑。
 
-## 架构速览
+更详细的模型说明请看：
+
+- [docs/model-introduction-and-scoring.md](docs/model-introduction-and-scoring.md)
+- [docs/model-training-and-usage.md](docs/model-training-and-usage.md)
+
+## 系统架构
 
 ```mermaid
 flowchart LR
@@ -76,33 +99,146 @@ flowchart LR
     Gateway --> Audit["audit-service"]
     Task --> Redis["Redis Stream"]
     Redis --> Worker["python-ai-service worker"]
-    Worker --> Runtime["sd15-electric / unipic2-kontext"]
-    Worker --> Score["ImageReward / CLIP-IQA / Aesthetic Predictor"]
+    Worker --> Runtime["Generation Runtime"]
+    Worker --> Score["Scoring Runtime"]
     Worker --> Asset
     Worker --> Audit
     Runtime --> Output["G:\\electric-ai-runtime\\outputs"]
 ```
 
-## 项目亮点
-
-- 本机原生优先，兼顾 Docker，适合课程设计和真实机器联调。
-- 保持 Go 微服务边界，同时把大模型执行集中在 Python 运行时中心。
-- 任务通过 Redis Stream 以 FIFO 方式流转，便于追踪与补偿。
-- 生成与评分完成后主动释放资源，减少单卡环境下的显存占用。
-- 前端直接展示生成进度、任务审计、模型状态与历史资产。
-
-## 核心能力
-
-- 真实生成：已接入 `sd15-electric` 与 `unipic2-kontext` 两条真实生成链路。
-- 真实评分：已接入 `ImageReward`、`CLIP-IQA`、`Aesthetic Predictor` 等评分链路，并支持分数校准。
-- FIFO 调度：任务由 Go 侧写入 Redis Stream，Python Worker 按 FIFO 消费并持续更新状态。
-- 显存回收：生成和评分完成后主动释放模型资源，降低模型切换时的显存压力。
-- 审计追踪：任务生命周期会写入审计服务，前端可查看阶段时间线与关联资产。
-- 双部署方式：既支持 Windows 原生运行，也支持 Docker 编排运行。
-
-## 技术架构
-
 ### 后端微服务
+
+- `services/gateway-service`
+  统一入口、代理转发、静态文件访问。
+- `services/auth-service`
+  登录鉴权与令牌签发。
+- `services/model-service`
+  模型目录、Prompt 模板、模型状态展示。
+- `services/task-service`
+  任务创建、状态推进、Redis Stream 投递。
+- `services/asset-service`
+  图像资产、Prompt 参数、评分结果、历史分页与详情。
+- `services/audit-service`
+  任务事件审计与时间线查询。
+
+### Python AI 运行时
+
+- `python-ai-service/app/runtimes/sd15_runtime.py`
+  `sd15-electric` 与 `sd15-electric-specialized` 的生成运行时基础。
+- `python-ai-service/app/runtimes/unipic2_runtime.py`
+  `unipic2-kontext` 运行时。
+- `python-ai-service/app/runtimes/scorers/image_reward_runtime.py`
+  文本一致性等图文偏好评分。
+- `python-ai-service/app/runtimes/scorers/clip_iqa_runtime.py`
+  视觉保真与物理合理性基础评分。
+- `python-ai-service/app/runtimes/scorers/aesthetic_runtime.py`
+  构图美学评分。
+- `python-ai-service/app/runtimes/scorers/power_score_runtime.py`
+  电力行业自训练评分模型运行时。
+- `python-ai-service/app/services/scoring_service.py`
+  四维评分组合、校准和总分汇总逻辑。
+
+### 前端工作台
+
+- `web-console/src/views/GenerateView.vue`
+  图像生成工作台与结果展示。
+- `web-console/src/views/HistoryView.vue`
+  历史中心与详情抽屉。
+- `web-console/src/views/ModelCenterView.vue`
+  模型中心。
+- `web-console/src/views/TaskAuditView.vue`
+  审计视图。
+- `web-console/src/views/DashboardView.vue`
+  平台总览。
+
+## 仓库结构
+
+```text
+electric-ai-platform
+├─ services/                    # Go 微服务
+│  ├─ auth-service
+│  ├─ model-service
+│  ├─ task-service
+│  ├─ asset-service
+│  ├─ audit-service
+│  ├─ gateway-service
+│  └─ platform-common
+├─ python-ai-service/           # Python AI 运行时中心
+│  ├─ app/
+│  ├─ scripts/
+│  └─ tests/
+├─ web-console/                 # Vue 3 前端工作台
+├─ scripts/                     # Windows / Docker 启动与验证脚本
+├─ deploy/                      # Docker、数据库初始化、镜像构建文件
+├─ docs/                        # 模型说明与运行手册
+└─ storage/                     # 本地存储目录占位
+```
+
+## 环境要求
+
+- Windows 11
+- Go `G:\Golang\go1.24.0`
+- Python `G:\miniconda3\envs\electric-ai-py310`
+- Node.js 与 `npm`
+- Docker Desktop
+- MySQL 8
+- Redis 7
+- NVIDIA GPU 与可用 CUDA 环境
+
+## 快速开始
+
+### 1. Windows 原生运行
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/setup-python-runtime.ps1
+powershell -ExecutionPolicy Bypass -File scripts/windows/download-runtime-models.ps1 -All
+powershell -ExecutionPolicy Bypass -File scripts/windows/start-platform.ps1
+powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1
+```
+
+详细说明见：[docs/windows-native-runbook.md](docs/windows-native-runbook.md)
+
+### 2. Docker GPU 运行
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker/up-platform.ps1
+powershell -ExecutionPolicy Bypass -File scripts/docker/download-models.ps1 -Model sd15-electric,unipic2-kontext,image-reward,aesthetic-predictor
+powershell -ExecutionPolicy Bypass -File scripts/docker/smoke-test.ps1 -ModelName unipic2-kontext
+```
+
+详细说明见：[docs/docker-gpu-runbook.md](docs/docker-gpu-runbook.md)
+
+## 默认访问地址
+
+### Windows 原生
+
+- Web Console：`http://127.0.0.1:5173`
+- Gateway：`http://127.0.0.1:8080`
+- Python Runtime：`http://127.0.0.1:8090`
+- MySQL：`127.0.0.1:3307`
+- Redis：`127.0.0.1:6380`
+
+### Docker GPU
+
+- Web Console：`http://127.0.0.1:18088`
+- Gateway：`http://127.0.0.1:18080`
+- Python Runtime：`http://127.0.0.1:18090`
+- MySQL：`127.0.0.1:13307`
+- Redis：`127.0.0.1:16380`
+
+## 适用场景
+
+- 电力行业图像生成实验
+- 变电站、输电塔、风电、光伏等题材生成
+- 图像评分与结果对比分析
+- 毕业设计展示、论文配套演示、课程设计原型
+
+## 说明
+
+- 根目录 `README` 用于 GitHub 展示与快速理解项目。
+- `docs/` 目录只保留模型说明、训练说明、函数说明和运行手册。
+- 之前阶段性的设计稿、计划稿和重复说明文档已删除，不再保留。
+- 当前分支可能同时存在未提交的业务代码改动；本文档只描述平台结构与运行方式，不代表所有开发任务都已结束。
 
 - `services/auth-service`
   登录、JWT 签发、基础身份校验。

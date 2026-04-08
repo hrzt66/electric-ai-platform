@@ -18,7 +18,7 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
 </script>
 
 <template>
-  <section class="preview-card">
+  <section class="preview-card preview-card--compact">
     <div class="preview-header">
       <div>
         <p class="preview-eyebrow">结果输出</p>
@@ -180,18 +180,32 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
 }
 
 @media (max-width: 768px) {
+  .preview-card--compact {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
   .preview-header {
     flex-direction: column;
     align-items: stretch;
+    margin-bottom: 8px;
   }
 
   .image-frame {
-    height: min(62vw, 320px);
+    height: min(54vw, 260px);
+    padding: 8px;
   }
 
   .meta-row {
     flex-direction: column;
     gap: 4px;
+  }
+
+  .thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
   }
 }
 </style>

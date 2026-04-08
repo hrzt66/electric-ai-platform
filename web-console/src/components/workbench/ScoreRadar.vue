@@ -47,7 +47,7 @@ const metricLabels = [
 </script>
 
 <template>
-  <section class="score-card">
+  <section class="score-card score-card--compact">
     <div class="score-header">
       <div>
         <p class="score-eyebrow">质量评估</p>
@@ -272,6 +272,12 @@ const metricLabels = [
 }
 
 @media (max-width: 768px) {
+  .score-card--compact {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
   .score-header {
     flex-direction: column;
     align-items: stretch;
@@ -279,6 +285,18 @@ const metricLabels = [
 
   .total {
     text-align: left;
+  }
+
+  .radar-svg {
+    width: min(100%, 188px);
+  }
+
+  .metric-list {
+    gap: 6px;
+  }
+
+  .metric-top {
+    font-size: 0.78rem;
   }
 }
 </style>

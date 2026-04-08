@@ -22,7 +22,7 @@ const selectedScoringModel = computed(
 </script>
 
 <template>
-  <section class="panel">
+  <section class="panel panel--compact">
     <div class="panel-header">
       <div>
         <p class="panel-eyebrow">生成输入</p>
@@ -228,6 +228,11 @@ const selectedScoringModel = computed(
   box-shadow: none;
 }
 
+.panel--compact .model-tip {
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
 @media (max-width: 700px) {
   .grid-two {
     grid-template-columns: 1fr;
@@ -235,13 +240,34 @@ const selectedScoringModel = computed(
 }
 
 @media (max-width: 768px) {
+  .panel {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
+  .panel-header {
+    margin-bottom: 8px;
+  }
+
+  .panel-title {
+    font-size: 1.02rem;
+  }
+
+  .tip-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   .form {
     overflow: visible;
     padding-right: 0;
   }
 
-  .panel {
-    padding: 14px;
+  :deep(.el-form-item) {
+    margin-bottom: 6px;
   }
 }
 </style>

@@ -258,15 +258,11 @@ onBeforeUnmount(() => {
           @update:active-index="activeIndex = $event"
         />
 
-        <el-button
-          v-if="isMobile && workbenchSections.includes('controls')"
-          class="open-parameter-button"
-          type="primary"
-          plain
-          @click="parameterDrawerOpen = true"
-        >
-          打开参数面板
-        </el-button>
+        <div v-if="isMobile && workbenchSections.includes('controls')" class="mobile-section-strip">
+          <el-button class="open-parameter-button" type="primary" plain @click="parameterDrawerOpen = true">
+            打开参数面板
+          </el-button>
+        </div>
 
         <GenerationProgressCard :task="platformStore.currentTask" :audit-events="platformStore.currentTaskAudit" />
       </div>
@@ -476,15 +472,40 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
   .workbench {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .preview-column,
   .side-column {
     order: initial;
+    gap: 10px;
   }
 
   .status-card {
     max-height: none;
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+    gap: 8px;
+  }
+
+  .mobile-section-strip {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    background: #ffffff;
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
+  .status-header {
+    margin-bottom: 8px;
+  }
+
+  .status-title {
+    font-size: 1rem;
+  }
+
+  .status-content {
+    max-height: 164px;
   }
 }
 </style>

@@ -16,7 +16,7 @@ const recentEvents = computed(() => getRecentAuditEvents(props.auditEvents, 2))
 </script>
 
 <template>
-  <section class="progress-card">
+  <section class="progress-card progress-card--compact">
     <template v-if="progress">
       <div class="progress-header">
         <div>
@@ -324,6 +324,12 @@ const recentEvents = computed(() => getRecentAuditEvents(props.auditEvents, 2))
 }
 
 @media (max-width: 768px) {
+  .progress-card--compact {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
   .progress-header {
     flex-direction: column;
     align-items: stretch;
@@ -331,6 +337,21 @@ const recentEvents = computed(() => getRecentAuditEvents(props.auditEvents, 2))
 
   .progress-badge {
     justify-items: start;
+  }
+
+  .phase-card {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .event-strip {
+    display: grid;
+    gap: 6px;
+  }
+
+  .event-chip {
+    padding: 8px 10px;
+    flex: initial;
   }
 }
 </style>

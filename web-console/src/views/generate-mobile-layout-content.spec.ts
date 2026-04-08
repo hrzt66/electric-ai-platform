@@ -11,6 +11,7 @@ describe('generate mobile layout', () => {
     expect(page).toContain('parameter-drawer')
     expect(page).toContain('open-parameter-button')
     expect(page).toContain('getWorkbenchSections')
+    expect(page).toContain('mobile-section-strip')
     expect(panel).toContain('panel--drawer')
   })
 })

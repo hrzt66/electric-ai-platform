@@ -64,7 +64,9 @@ onMounted(() => {
             这里聚合展示任务调度、模型可用性和资产沉淀情况，方便你快速判断平台是否处于可用状态。
           </p>
         </div>
-        <router-link class="hero-link" to="/generate">进入生成工作台</router-link>
+        <div class="hero-actions">
+          <router-link class="hero-link" to="/generate">进入生成工作台</router-link>
+        </div>
       </section>
 
       <section class="summary-grid">
@@ -267,8 +269,23 @@ onMounted(() => {
   .hero,
   .summary-grid,
   .list-grid {
-    display: grid;
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero {
+    align-items: stretch;
+  }
+
+  .hero-actions,
+  .hero-link {
+    width: 100%;
+  }
+
+  .panel-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

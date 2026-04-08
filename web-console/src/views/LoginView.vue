@@ -568,4 +568,27 @@ async function submit() {
     padding: 22px 18px 18px;
   }
 }
+
+@media (max-width: 768px) {
+  .control-stage {
+    padding: 24px 16px 8px;
+  }
+
+  .stage-copy {
+    gap: 14px;
+  }
+
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .system-board,
+  .login-shell {
+    margin-top: 18px;
+  }
+
+  .shell-header {
+    flex-direction: column;
+  }
+}
 </style>

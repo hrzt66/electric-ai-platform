@@ -219,4 +219,15 @@ watch(
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 768px) {
+  .summary-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+}
 </style>

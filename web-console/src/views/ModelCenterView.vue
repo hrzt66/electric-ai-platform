@@ -244,4 +244,17 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 768px) {
+  .hero,
+  .section-header,
+  .card-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .model-card {
+    padding: 18px;
+  }
+}
 </style>

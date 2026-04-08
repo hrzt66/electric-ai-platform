@@ -11,6 +11,42 @@ DEFAULT_RUNTIME_ROOT = Path(r"G:\electric-ai-runtime")
 DEFAULT_UNIPIC2_OFFLOAD_MODE = "model"
 
 
+def _load_local_env_files() -> None:
+    for path in _dotenv_candidates():
+        for key, value in _parse_env_file(path).items():
+            if os.getenv(key) is None:
+                os.environ[key] = value
+
+
+def _dotenv_candidates() -> list[Path]:
+    cwd = Path.cwd()
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+
+    for directory in [cwd, *cwd.parents]:
+        for name in (".env", ".env.local"):
+            path = directory / name
+            if not path.is_file() or path in seen:
+                continue
+            seen.add(path)
+            candidates.append(path)
+
+    return candidates
+
+
+def _parse_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip("\"'")
+
+    return values
+
+
 def _read_path_env(name: str, fallback: Path) -> Path:
     value = os.getenv(name)
     return Path(value) if value else fallback
@@ -46,6 +82,7 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         # 保持所有入口共享同一套变量命名，便于本机、Docker 和测试环境之间切换。
+        _load_local_env_files()
         return cls(
             runtime_root=_read_path_env("ELECTRIC_AI_RUNTIME_ROOT", DEFAULT_RUNTIME_ROOT),
             task_service_base_url=os.getenv("TASK_SERVICE_BASE_URL", "http://localhost:8083"),

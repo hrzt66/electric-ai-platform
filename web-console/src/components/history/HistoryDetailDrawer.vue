@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import AuditTimeline from '../audit/AuditTimeline.vue'
 import { buildImageUrl } from '../../api/platform'
 import type { AssetDetail, AuditEvent } from '../../types/platform'
+import { getScoreGrade } from '../../utils/score-grade'
 
 const props = defineProps<{
   visible: boolean
@@ -19,12 +20,17 @@ const scores = computed(() => {
   if (!props.detail) {
     return []
   }
+
   return [
-    ['视觉保真', props.detail.score.visual_fidelity],
-    ['文本一致', props.detail.score.text_consistency],
-    ['物理合理', props.detail.score.physical_plausibility],
-    ['构图美学', props.detail.score.composition_aesthetics],
-    ['总分', props.detail.score.total_score],
+    { label: '视觉保真', value: props.detail.score.visual_fidelity, grade: getScoreGrade(props.detail.score.visual_fidelity) },
+    { label: '文本一致', value: props.detail.score.text_consistency, grade: getScoreGrade(props.detail.score.text_consistency) },
+    { label: '物理合理', value: props.detail.score.physical_plausibility, grade: getScoreGrade(props.detail.score.physical_plausibility) },
+    {
+      label: '构图美学',
+      value: props.detail.score.composition_aesthetics,
+      grade: getScoreGrade(props.detail.score.composition_aesthetics),
+    },
+    { label: '总分', value: props.detail.score.total_score },
   ]
 })
 </script>
@@ -54,9 +60,12 @@ const scores = computed(() => {
       </el-descriptions>
 
       <div class="score-grid">
-        <article v-for="[label, value] in scores" :key="label" class="score-chip">
-          <span>{{ label }}</span>
-          <strong>{{ Number(value).toFixed(2) }}</strong>
+        <article v-for="score in scores" :key="score.label" class="score-chip">
+          <div class="score-chip__top">
+            <span>{{ score.label }}</span>
+            <span v-if="score.grade" class="grade-chip" :data-grade="score.grade">{{ score.grade }}</span>
+          </div>
+          <strong>{{ Number(score.value).toFixed(2) }}</strong>
         </article>
       </div>
 
@@ -117,7 +126,14 @@ const scores = computed(() => {
   border-radius: 16px;
   background: #f8fafc;
   display: grid;
-  gap: 6px;
+  gap: 8px;
+}
+
+.score-chip__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .score-chip span {
@@ -128,6 +144,50 @@ const scores = computed(() => {
 .score-chip strong {
   color: #17202b;
   font-size: 1.05rem;
+}
+
+.grade-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+
+.grade-chip[data-grade='A'] {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.grade-chip[data-grade='B'] {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.grade-chip[data-grade='C'] {
+  color: #854d0e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.grade-chip[data-grade='D'] {
+  color: #b45309;
+  background: #ffedd5;
+  border-color: #fdba74;
+}
+
+.grade-chip[data-grade='E'] {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 .section-title {

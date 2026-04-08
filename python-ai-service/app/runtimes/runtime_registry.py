@@ -32,6 +32,7 @@ class RuntimeRegistry:
         # 生成模型通过工厂注册，后续新增模型时只需要在这里挂接即可。
         self._generation_runtime_factories: dict[str, Callable[[], Any]] = {
             "sd15-electric": self._build_sd15_runtime,
+            "sd15-electric-specialized": self._build_sd15_specialized_runtime,
             "unipic2-kontext": self._build_unipic2_runtime,
         }
         self._runtime_cache: dict[str, Any] = {}
@@ -105,6 +106,13 @@ class RuntimeRegistry:
         """构造 SD1.5 运行时实例。"""
         return SD15Runtime(
             model_dir=self._settings.generation_model_dir / "sd15-electric",
+            output_dir=self._settings.output_image_dir,
+        )
+
+    def _build_sd15_specialized_runtime(self) -> SD15Runtime:
+        """构造电力行业专用 SD1.5 运行时实例。"""
+        return SD15Runtime(
+            model_dir=self._settings.generation_model_dir / "sd15-electric-specialized",
             output_dir=self._settings.output_image_dir,
         )
 

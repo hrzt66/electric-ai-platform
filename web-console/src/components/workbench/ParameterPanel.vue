@@ -6,6 +6,7 @@ import type { GenerateTaskRequest, ModelRecord } from '../../types/platform'
 const props = defineProps<{
   form: GenerateTaskRequest
   models: ModelRecord[]
+  scoringModels: ModelRecord[]
   submitting: boolean
 }>()
 
@@ -14,8 +15,10 @@ const emit = defineEmits<{
   fillDefaults: [model: ModelRecord]
 }>()
 
-// 当前选中模型的说明会在面板顶部展示，帮助用户理解不同模型的定位。
 const selectedModel = computed(() => props.models.find((item) => item.model_name === props.form.model_name) ?? null)
+const selectedScoringModel = computed(
+  () => props.scoringModels.find((item) => item.model_name === props.form.scoring_model_name) ?? null,
+)
 </script>
 
 <template>
@@ -46,8 +49,24 @@ const selectedModel = computed(() => props.models.find((item) => item.model_name
         <el-button size="small" text type="primary" @click="emit('fillDefaults', selectedModel)">应用推荐提示词</el-button>
       </div>
 
+      <el-form-item label="评分模型">
+        <el-select v-model="form.scoring_model_name" size="small" style="width: 100%">
+          <el-option
+            v-for="item in scoringModels"
+            :key="item.model_name"
+            :label="item.display_name || item.model_name"
+            :value="item.model_name"
+          />
+        </el-select>
+      </el-form-item>
+
+      <div v-if="selectedScoringModel" class="model-tip model-tip-secondary">
+        <p class="tip-name">{{ selectedScoringModel.display_name || selectedScoringModel.model_name }}</p>
+        <p class="tip-text">{{ selectedScoringModel.description || '暂无评分模型说明' }}</p>
+      </div>
+
       <el-form-item label="正向提示词">
-        <el-input v-model="form.prompt" type="textarea" :rows="4" size="small" placeholder="描述你想生成的工业电力场景。" />
+        <el-input v-model="form.prompt" type="textarea" :rows="4" size="small" placeholder="描述你想生成的电力工业场景。" />
       </el-form-item>
 
       <el-form-item label="负向提示词">
@@ -134,6 +153,10 @@ const selectedModel = computed(() => props.models.find((item) => item.model_name
   padding: 10px 12px;
   border-radius: 14px;
   background: linear-gradient(135deg, rgba(211, 164, 73, 0.12), rgba(19, 81, 180, 0.06));
+}
+
+.model-tip-secondary {
+  background: linear-gradient(135deg, rgba(19, 81, 180, 0.10), rgba(45, 154, 82, 0.08));
 }
 
 .tip-name {

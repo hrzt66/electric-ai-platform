@@ -12,6 +12,33 @@ import { usePlatformStore } from '../stores/platform'
 import type { GenerateTaskRequest, ModelRecord, ScoreSummary } from '../types/platform'
 import { FRONTEND_DEFAULT_NEGATIVE_PROMPT, FRONTEND_DEFAULT_POSITIVE_PROMPT } from './generate-defaults'
 
+const FALLBACK_SCORING_MODELS: ModelRecord[] = [
+  {
+    id: -1,
+    model_name: 'electric-score-v1',
+    display_name: 'Electric Score V1 (Legacy)',
+    model_type: 'scoring',
+    service_name: 'python-ai-service',
+    status: 'available',
+    description: '现有四维评分器，基于 ImageReward、CLIP-IQA 与美学评分运行时。',
+    default_positive_prompt: '',
+    default_negative_prompt: '',
+    local_path: 'G:/electric-ai-runtime/models/scoring/electric-score-v1',
+  },
+  {
+    id: -2,
+    model_name: 'electric-score-v2',
+    display_name: 'Electric Score V2 (Self-Trained)',
+    model_type: 'scoring',
+    service_name: 'python-ai-service',
+    status: 'available',
+    description: '自主训练的轻量四维评分模型，针对电力场景和 6GB 显存环境优化。',
+    default_positive_prompt: '',
+    default_negative_prompt: '',
+    local_path: 'G:/electric-ai-runtime/models/scoring/electric-score-v2',
+  },
+]
+
 const route = useRoute()
 const platformStore = usePlatformStore()
 const activeIndex = ref(0)
@@ -25,6 +52,7 @@ const form = reactive<GenerateTaskRequest>({
   prompt: FRONTEND_DEFAULT_POSITIVE_PROMPT,
   negative_prompt: FRONTEND_DEFAULT_NEGATIVE_PROMPT,
   model_name: 'sd15-electric',
+  scoring_model_name: 'electric-score-v1',
   seed: -1,
   steps: 20,
   guidance_scale: 7.5,
@@ -35,6 +63,12 @@ const form = reactive<GenerateTaskRequest>({
 
 const activeAsset = computed(() => platformStore.currentAssets[activeIndex.value] ?? null)
 const generationModels = computed(() => platformStore.models.filter((item) => item.model_type === 'generation'))
+const scoringModels = computed(() => {
+  const catalog = platformStore.models.filter(
+    (item) => item.model_type === 'scoring' && item.model_name.startsWith('electric-score-'),
+  )
+  return catalog.length > 0 ? catalog : FALLBACK_SCORING_MODELS
+})
 const currentModel = computed(() => platformStore.models.find((item) => item.model_name === form.model_name) ?? null)
 const activeScores = computed<ScoreSummary | null>(() => {
   if (!activeAsset.value) {
@@ -139,6 +173,15 @@ watch(
   },
 )
 
+watch(
+  () => platformStore.currentTask?.scoring_model_name,
+  (value) => {
+    if (typeof value === 'string' && value.trim()) {
+      form.scoring_model_name = value
+    }
+  },
+)
+
 const hasWorkbenchData = computed(() => generationModels.value.length > 0 || Boolean(platformStore.currentTask))
 
 async function bootstrapWorkbench() {
@@ -185,6 +228,7 @@ onBeforeUnmount(() => {
       <ParameterPanel
         :form="form"
         :models="generationModels"
+        :scoring-models="scoringModels"
         :submitting="platformStore.submitting"
         @submit="submit"
         @fill-defaults="fillDefaults"

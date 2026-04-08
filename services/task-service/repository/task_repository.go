@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS task_jobs (
 	status VARCHAR(32) NOT NULL,
 	stage VARCHAR(32) NOT NULL,
 	model_name VARCHAR(128) NOT NULL,
+	scoring_model_name VARCHAR(128) NOT NULL DEFAULT 'electric-score-v1',
 	prompt TEXT,
 	negative_prompt TEXT,
 	payload_json LONGTEXT NOT NULL,
@@ -43,7 +44,8 @@ CREATE TABLE IF NOT EXISTS task_jobs (
 `,
 		`ALTER TABLE task_jobs ADD COLUMN stage VARCHAR(32) NOT NULL DEFAULT 'queued' AFTER status`,
 		`ALTER TABLE task_jobs ADD COLUMN model_name VARCHAR(128) NOT NULL DEFAULT '' AFTER stage`,
-		`ALTER TABLE task_jobs ADD COLUMN prompt TEXT NULL AFTER model_name`,
+		`ALTER TABLE task_jobs ADD COLUMN scoring_model_name VARCHAR(128) NOT NULL DEFAULT 'electric-score-v1' AFTER model_name`,
+		`ALTER TABLE task_jobs ADD COLUMN prompt TEXT NULL AFTER scoring_model_name`,
 		`ALTER TABLE task_jobs ADD COLUMN negative_prompt TEXT NULL AFTER prompt`,
 		`ALTER TABLE task_jobs MODIFY COLUMN payload_json LONGTEXT NOT NULL`,
 		`ALTER TABLE task_jobs ADD COLUMN error_message TEXT NULL AFTER payload_json`,
@@ -84,8 +86,8 @@ func (r *TaskRepository) Create(ctx context.Context, job model.Job) (model.Job, 
 	}
 
 	const query = `
-INSERT INTO task_jobs (job_type, status, stage, model_name, prompt, negative_prompt, payload_json, error_message)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO task_jobs (job_type, status, stage, model_name, scoring_model_name, prompt, negative_prompt, payload_json, error_message)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 	result, err := r.db.ExecContext(
@@ -95,6 +97,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		job.Status,
 		job.Stage,
 		job.ModelName,
+		job.ScoringModelName,
 		job.Prompt,
 		job.NegativePrompt,
 		job.PayloadJSON,
@@ -119,7 +122,7 @@ func (r *TaskRepository) GetByID(ctx context.Context, id int64) (model.Job, erro
 	}
 
 	const query = `
-SELECT id, job_type, status, stage, model_name, prompt, negative_prompt, payload_json, COALESCE(error_message, ''), created_at, updated_at
+SELECT id, job_type, status, stage, model_name, scoring_model_name, prompt, negative_prompt, payload_json, COALESCE(error_message, ''), created_at, updated_at
 FROM task_jobs
 WHERE id = ?
 `
@@ -131,6 +134,7 @@ WHERE id = ?
 		&job.Status,
 		&job.Stage,
 		&job.ModelName,
+		&job.ScoringModelName,
 		&job.Prompt,
 		&job.NegativePrompt,
 		&job.PayloadJSON,
@@ -150,7 +154,7 @@ func (r *TaskRepository) List(ctx context.Context) ([]model.Job, error) {
 
 	// 历史列表默认按最新任务倒序返回，满足前端工作台与审计页的主要浏览路径。
 	const query = `
-SELECT id, job_type, status, stage, model_name, prompt, negative_prompt, payload_json, COALESCE(error_message, ''), created_at, updated_at
+SELECT id, job_type, status, stage, model_name, scoring_model_name, prompt, negative_prompt, payload_json, COALESCE(error_message, ''), created_at, updated_at
 FROM task_jobs
 ORDER BY id DESC
 LIMIT 50
@@ -171,6 +175,7 @@ LIMIT 50
 			&job.Status,
 			&job.Stage,
 			&job.ModelName,
+			&job.ScoringModelName,
 			&job.Prompt,
 			&job.NegativePrompt,
 			&job.PayloadJSON,

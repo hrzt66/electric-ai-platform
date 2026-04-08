@@ -9,6 +9,7 @@ export type GenerateTaskRequest = {
   prompt: string
   negative_prompt: string
   model_name: string
+  scoring_model_name?: string
   seed: number
   steps: number
   guidance_scale: number
@@ -24,6 +25,7 @@ export type GenerateTask = {
   stage: string
   error_message: string
   model_name: string
+  scoring_model_name?: string
   prompt: string
   negative_prompt: string
   payload_json: string

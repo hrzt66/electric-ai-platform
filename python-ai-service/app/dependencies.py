@@ -10,6 +10,7 @@ from app.runtimes.runtime_registry import RuntimeRegistry
 from app.runtimes.scorers.aesthetic_runtime import AestheticRuntime
 from app.runtimes.scorers.clip_iqa_runtime import ClipIQARuntime
 from app.runtimes.scorers.image_reward_runtime import ImageRewardRuntime
+from app.runtimes.scorers.power_score_runtime import PowerScoreRouter, PowerScoreRuntime
 from app.services.generation_service import GenerationService
 from app.services.job_pipeline import JobPipeline
 from app.services.scoring_service import ScoringService
@@ -36,6 +37,12 @@ def build_scoring_service(
         text_runtime=ImageRewardRuntime(),
         aesthetics_runtime=AestheticRuntime(),
         shared_clip_runtime=ClipIQARuntime(mode="visual_fidelity"),
+        bundle_runtime=PowerScoreRouter(
+            {
+                "electric-score-v2": PowerScoreRuntime(runtime_settings.scoring_model_dir / "electric-score-v2"),
+                "electric-score-v3": PowerScoreRuntime(runtime_settings.scoring_model_dir / "electric-score-v3"),
+            }
+        ),
         release_after_batch=(
             runtime_settings.scoring_release_after_batch if release_after_batch is None else release_after_batch
         ),

@@ -34,6 +34,15 @@ class UniPic2Runtime:
             self.offload_mode,
         )
 
+    def _model_load_kwargs(self, *, dtype, cuda_available: bool) -> dict:
+        kwargs = {
+            "torch_dtype": dtype,
+            "local_files_only": True,
+        }
+        if cuda_available:
+            kwargs["low_cpu_mem_usage"] = True
+        return kwargs
+
     def _build_default_pipeline(self):
         """按 UniPic2 所需组件逐个加载 transformer、VAE 和多路文本编码器。"""
         import torch
@@ -48,25 +57,24 @@ class UniPic2Runtime:
         from unipicv2.pipeline_stable_diffusion_3_kontext import StableDiffusion3KontextPipeline
         from unipicv2.transformer_sd3_kontext import SD3Transformer2DKontextModel
 
-        dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+        cuda_available = bool(torch.cuda.is_available())
+        dtype = torch.float16 if cuda_available else torch.float32
+        model_load_kwargs = self._model_load_kwargs(dtype=dtype, cuda_available=cuda_available)
 
         transformer = SD3Transformer2DKontextModel.from_pretrained(
             self.model_dir,
             subfolder="transformer",
-            torch_dtype=dtype,
-            local_files_only=True,
+            **model_load_kwargs,
         )
         vae = AutoencoderKL.from_pretrained(
             self.model_dir,
             subfolder="vae",
-            torch_dtype=dtype,
-            local_files_only=True,
+            **model_load_kwargs,
         )
         text_encoder = CLIPTextModelWithProjection.from_pretrained(
             self.model_dir,
             subfolder="text_encoder",
-            torch_dtype=dtype,
-            local_files_only=True,
+            **model_load_kwargs,
         )
         tokenizer = CLIPTokenizer.from_pretrained(
             self.model_dir,
@@ -76,8 +84,7 @@ class UniPic2Runtime:
         text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
             self.model_dir,
             subfolder="text_encoder_2",
-            torch_dtype=dtype,
-            local_files_only=True,
+            **model_load_kwargs,
         )
         tokenizer_2 = CLIPTokenizer.from_pretrained(
             self.model_dir,
@@ -87,8 +94,7 @@ class UniPic2Runtime:
         text_encoder_3 = T5EncoderModel.from_pretrained(
             self.model_dir,
             subfolder="text_encoder_3",
-            torch_dtype=dtype,
-            local_files_only=True,
+            **model_load_kwargs,
         )
         tokenizer_3 = T5TokenizerFast.from_pretrained(
             self.model_dir,
@@ -121,7 +127,7 @@ class UniPic2Runtime:
         if hasattr(pipe.transformer, "enable_forward_chunking"):
             pipe.transformer.enable_forward_chunking(chunk_size=1, dim=1)
 
-        return self._apply_execution_strategy(pipe, cuda_available=bool(torch.cuda.is_available()))
+        return self._apply_execution_strategy(pipe, cuda_available=cuda_available)
 
     def _apply_execution_strategy(self, pipe, *, cuda_available: bool):
         """根据 offload_mode 选择 CPU/GPU 执行策略，平衡显存与速度。"""

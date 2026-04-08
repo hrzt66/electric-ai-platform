@@ -30,8 +30,8 @@ func Load() (Config, error) {
 	return Config{
 		AppName:   getenv("APP_NAME", "unknown-service"),
 		HTTPPort:  getenv("HTTP_PORT", "8080"),
-		MySQLDSN:  getenv("MYSQL_DSN", "root:root@tcp(127.0.0.1:13307)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local"),
-		RedisAddr: getenv("REDIS_ADDR", "localhost:6379"),
+		MySQLDSN:  getenv("MYSQL_DSN", "root:root@tcp(127.0.0.1:3307)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local"),
+		RedisAddr: getenv("REDIS_ADDR", "localhost:6380"),
 		// TODO: 生产环境应从密钥管理系统读取 JWT_SECRET，而不是仅依赖环境变量文件。
 		JWTSecret: jwtSecret,
 	}, nil

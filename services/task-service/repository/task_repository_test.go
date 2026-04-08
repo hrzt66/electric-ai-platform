@@ -17,4 +17,7 @@ func TestTaskSchemaStatementsIncludeLegacyColumnMigrations(t *testing.T) {
 	if !strings.Contains(joined, "ADD COLUMN model_name") {
 		t.Fatal("expected task schema to backfill model_name column")
 	}
+	if !strings.Contains(joined, "ADD COLUMN scoring_model_name") {
+		t.Fatal("expected task schema to backfill scoring_model_name column")
+	}
 }

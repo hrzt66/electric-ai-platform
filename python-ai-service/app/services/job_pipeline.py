@@ -32,16 +32,24 @@ class JobPipeline:
         # 整条链路始终围绕“状态推进 + 审计留痕 + 资源释放”三件事展开。
         try:
             logger.info(
-                "job %s starting model=%s images=%s size=%sx%s steps=%s",
+                "job %s starting model=%s scoring=%s images=%s size=%sx%s steps=%s",
                 job.job_id,
                 job.model_name,
+                job.scoring_model_name,
                 job.num_images,
                 job.width,
                 job.height,
                 job.steps,
             )
             self._task_client.update_status(job.job_id, "preparing", "preparing")
-            self._audit_client.record_event("task.preparing", {"job_id": job.job_id, "model_name": job.model_name})
+            self._audit_client.record_event(
+                "task.preparing",
+                {
+                    "job_id": job.job_id,
+                    "model_name": job.model_name,
+                    "scoring_model_name": job.scoring_model_name,
+                },
+            )
 
             runtime = self._runtime_registry.get_generation_runtime(job.model_name)
             logger.info(
@@ -64,6 +72,14 @@ class JobPipeline:
             logger.info("job %s scoring started count=%s", job.job_id, len(generated_images))
             scored_assets = self._scoring_service.score_batch(job, generated_images)
             logger.info("job %s scoring completed count=%s", job.job_id, len(scored_assets))
+            self._audit_client.record_event(
+                "scoring.completed",
+                {
+                    "job_id": job.job_id,
+                    "asset_count": len(scored_assets),
+                    "scoring_model_name": job.scoring_model_name,
+                },
+            )
 
             self._task_client.update_status(job.job_id, "persisting", "persisting")
             logger.info("job %s persisting assets count=%s", job.job_id, len(scored_assets))

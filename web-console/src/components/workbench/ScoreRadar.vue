@@ -2,16 +2,22 @@
 import { computed } from 'vue'
 
 import type { ScoreSummary } from '../../types/platform'
+import { getScoreGrade } from '../../utils/score-grade'
 
 const props = defineProps<{
   scores: ScoreSummary | null
 }>()
 
 const metrics = computed(() => [
-  { label: '视觉保真', value: props.scores?.visual_fidelity ?? 0, tone: '#1d4ed8' },
-  { label: '文本一致', value: props.scores?.text_consistency ?? 0, tone: '#15803d' },
-  { label: '物理合理', value: props.scores?.physical_plausibility ?? 0, tone: '#d97706' },
-  { label: '构图美学', value: props.scores?.composition_aesthetics ?? 0, tone: '#b91c1c' },
+  { label: '视觉保真', value: props.scores?.visual_fidelity ?? 0, tone: '#1d4ed8', grade: getScoreGrade(props.scores?.visual_fidelity ?? 0) },
+  { label: '文本一致', value: props.scores?.text_consistency ?? 0, tone: '#15803d', grade: getScoreGrade(props.scores?.text_consistency ?? 0) },
+  { label: '物理合理', value: props.scores?.physical_plausibility ?? 0, tone: '#d97706', grade: getScoreGrade(props.scores?.physical_plausibility ?? 0) },
+  {
+    label: '构图美学',
+    value: props.scores?.composition_aesthetics ?? 0,
+    tone: '#b91c1c',
+    grade: getScoreGrade(props.scores?.composition_aesthetics ?? 0),
+  },
 ])
 
 function polarPoint(index: number, value: number, radius = 84) {
@@ -83,7 +89,10 @@ const metricLabels = [
       <div v-for="metric in metrics" :key="metric.label" class="metric-item">
         <div class="metric-top">
           <span>{{ metric.label }}</span>
-          <strong>{{ metric.value.toFixed(2) }}</strong>
+          <div class="metric-value">
+            <strong>{{ metric.value.toFixed(2) }}</strong>
+            <span class="grade-chip" :data-grade="metric.grade">{{ metric.grade }}</span>
+          </div>
         </div>
         <div class="metric-bar">
           <span class="metric-fill" :style="{ width: `${metric.value}%`, background: metric.tone }" />
@@ -198,6 +207,12 @@ const metricLabels = [
   font-size: 0.84rem;
 }
 
+.metric-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .metric-bar {
   margin-top: 4px;
   height: 8px;
@@ -210,5 +225,49 @@ const metricLabels = [
   display: block;
   height: 100%;
   border-radius: inherit;
+}
+
+.grade-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+
+.grade-chip[data-grade='A'] {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.grade-chip[data-grade='B'] {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.grade-chip[data-grade='C'] {
+  color: #854d0e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.grade-chip[data-grade='D'] {
+  color: #b45309;
+  background: #ffedd5;
+  border-color: #fdba74;
+}
+
+.grade-chip[data-grade='E'] {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 </style>

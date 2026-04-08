@@ -8,6 +8,7 @@ class GenerateRequest(BaseModel):
     prompt: str
     negative_prompt: str
     model_name: str
+    scoring_model_name: str = "electric-score-v1"
     seed: int
     steps: int
     guidance_scale: float

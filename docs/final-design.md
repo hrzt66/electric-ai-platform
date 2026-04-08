@@ -1,52 +1,52 @@
-# Electric AI Platform Final Design
+# 电力 AI 图像生成与多维质量评价平台最终设计文档
 
-> Version: v1.0
-> Updated: 2026-04-08
-> Note: This document consolidates the previous platform specs, runtime migration notes, scoring-model design, UI/UX redesign docs, and mobile/web-console design iterations into a single final design document.
+> 版本：v1.0
+> 更新日期：2026-04-08
+> 说明：本文档将此前的平台总体设计、旧能力迁移设计、评分模型设计、界面改版设计、移动端适配设计与历史中心优化设计统一收敛为一份最终版设计文档，作为当前仓库唯一正式设计说明。
 
-## 1. Project Positioning
+## 1. 项目定位
 
-Electric AI Platform is a graduation-project-oriented but engineering-driven system for power-industry image generation and multidimensional quality evaluation. The platform is not limited to a one-off image generation demo. It aims to provide a complete product loop across generation, scoring, history review, audit tracking, model management, and deployment.
+电力 AI Platform 是一个面向毕业设计场景、同时具备工程化落地思路的电力行业图像生成与多维质量评价平台。它的目标不是仅完成一次图像生成演示，而是形成覆盖图像生成、质量评价、历史回看、任务审计、模型管理与部署运行的完整闭环。
 
-The final system should support:
+最终平台需要支撑以下核心能力：
 
-- realistic power-scene image generation
-- four-dimension image quality scoring
-- model and prompt template management
-- task orchestration and audit visibility
-- history review and result comparison
-- Windows-native and Docker deployment paths
+- 电力场景真实风格图像生成
+- 图像质量四维评分
+- 模型与 Prompt 模板管理
+- 异步任务编排与审计跟踪
+- 历史结果回看与结果对比
+- Windows 原生与 Docker 双运行方式
 
-## 2. Final Scope
+## 2. 最终范围
 
-### 2.1 In Scope
+### 2.1 本期纳入范围
 
-- Go microservice backend with clear domain boundaries
-- Python runtime for real generation and real scoring
-- Vue 3 web console with desktop and mobile support
-- model registry, task center, asset center, audit center
-- history pagination, score display, result preview, audit readability
-- specialized electric-domain generation and scoring model evolution path
+- 基于 Go 微服务的后端平台
+- 基于 Python 的真实生成与真实评分运行时
+- 支持桌面端与手机端的 Vue 3 控制台
+- 模型中心、任务中心、资产中心、审计中心
+- 历史分页、分数展示、结果预览、审计可读化
+- 面向电力行业的专用生成模型与评分模型演进路线
 
-### 2.2 Out of Scope
+### 2.2 本期不纳入范围
 
-- Kubernetes and multi-node production orchestration
-- object storage replacement as a hard requirement for v1
-- fully automated external alert channels
-- separate mobile app or dedicated mobile-only frontend
+- Kubernetes 与多节点生产级编排
+- 对象存储替换作为第一版硬要求
+- 完整外部告警通道自动化
+- 独立移动 App 或独立手机站点
 
-## 3. Architecture Overview
+## 3. 总体架构设计
 
-### 3.1 Technology Stack
+### 3.1 技术栈
 
-- Frontend: `Vue 3`, `TypeScript`, `Vite`, `Pinia`, `Vue Router`, `Element Plus`
-- Backend: `Go 1.24`, `Gin`
-- AI Runtime: `Python 3.10`, `FastAPI`, `PyTorch`, `diffusers`, `transformers`
-- Database: `MySQL 8`
-- Queue and cache: `Redis 7`
-- Deployment: `Windows native scripts` and `Docker Compose`
+- 前端：`Vue 3`、`TypeScript`、`Vite`、`Pinia`、`Vue Router`、`Element Plus`
+- 后端：`Go 1.24`、`Gin`
+- AI 运行时：`Python 3.10`、`FastAPI`、`PyTorch`、`diffusers`、`transformers`
+- 数据库：`MySQL 8`
+- 队列与缓存：`Redis 7`
+- 部署：`Windows 原生脚本` 与 `Docker Compose`
 
-### 3.2 System Topology
+### 3.2 系统拓扑
 
 ```text
 Web Console
@@ -58,10 +58,10 @@ Gateway Service
     |          |           |           |           |           |
     v          v           v           v           v           v
  Auth      Model        Task        Asset       Audit      Runtime Status
- Service   Service      Service     Service     Service    (logical)
+ Service   Service      Service     Service     Service    (逻辑能力)
                           |
                           v
-                        Redis Streams
+                      Redis Streams
                           |
                           v
                    Python AI Runtime
@@ -69,202 +69,216 @@ Gateway Service
             +-------------+-------------+
             |                           |
             v                           v
-   Generation Runtime             Scoring Runtime
+        Generation Runtime          Scoring Runtime
 ```
 
-### 3.3 Core Design Principles
+### 3.3 核心设计原则
 
-- Keep Go microservice boundaries stable instead of collapsing back to a monolith.
-- Centralize all heavy AI execution in Python runtime to isolate deep-learning dependencies.
-- Treat generation, scoring, export, and comparison as task-driven workflows.
-- Preserve a unified design language across login, workbench, history, audit, and mobile views.
-- Favor deployable and demo-ready solutions over oversized architecture.
+- 保持 Go 微服务边界清晰，不回退为单体结构
+- 所有重型 AI 执行能力统一收敛到 Python 运行时
+- 生成、评分、导出、对比等操作统一任务化
+- 登录、工作台、历史、审计、移动端保持统一产品语言
+- 优先保证“可部署、可演示、可答辩”，避免过度设计
 
-## 4. Domain Service Design
+## 4. 领域服务设计
 
 ### 4.1 Gateway Service
 
-- unified API entry
-- token verification and user context forwarding
-- request logging, rate limiting, CORS, and response shaping
-- static image access and cross-service gateway routing
+职责：
+
+- 系统统一 API 入口
+- Token 校验与用户上下文透传
+- 请求日志、限流、跨域和统一响应封装
+- 图片静态访问与跨服务路由转发
 
 ### 4.2 Auth Service
 
-- login and token issuing
-- refresh-token flow
-- user identity and basic permission checks
-- login audit records
+职责：
+
+- 登录与令牌签发
+- Refresh Token 流程
+- 基础身份识别与权限校验
+- 登录审计记录
 
 ### 4.3 Model Service
 
-- generation-model registry
-- scoring-model registry
-- prompt templates and default presets
-- runtime capability and availability status
+职责：
+
+- 生成模型注册与版本管理
+- 评分模型注册与版本管理
+- Prompt 模板与默认参数管理
+- 模型可用状态和运行时能力展示
 
 ### 4.4 Task Service
 
-- job creation and lifecycle tracking
-- Redis Stream publish flow
-- generate and score chaining
-- retry, timeout, and cancel support
+职责：
+
+- 任务创建与生命周期管理
+- Redis Stream 投递
+- 生成任务与评分任务串联
+- 重试、超时、取消等控制能力
 
 ### 4.5 Asset Service
 
-- generated image persistence
-- prompt and score result persistence
-- history list and history detail aggregation
-- paginated querying with filters
+职责：
+
+- 生成图像持久化
+- Prompt 参数与评分结果持久化
+- 历史中心列表与详情聚合
+- 带筛选条件的分页查询
 
 ### 4.6 Audit Service
 
-- task-event recording
-- readable audit timeline data source
-- operation trace and export audit basis
+职责：
+
+- 任务事件记录
+- 可读化审计时间线数据提供
+- 操作追踪与导出行为审计基础
 
 ### 4.7 Python AI Runtime
 
-- model loading and unloading
-- generation execution
-- multidimensional scoring execution
-- explicit VRAM cleanup
-- task status callback and failure summary reporting
+职责：
 
-## 5. Data and Storage Design
+- 模型加载与卸载
+- 图像生成执行
+- 多维评分执行
+- 显存主动释放
+- 任务状态回写与错误摘要上报
 
-### 5.1 Existing Schema Basis
+## 5. 数据与存储设计
 
-The current project started from a minimal `DB.sql` with:
+### 5.1 现有数据基础
+
+项目最初已有的 `DB.sql` 仅包含以下基础表：
 
 - `ai_models`
 - `images`
 - `image_prompts`
 
-This is enough for an early demo, but not enough for a real platform loop.
+这可以支撑最初级演示，但不足以承载完整平台化链路。
 
-### 5.2 Final Recommended Data Domains
+### 5.2 最终推荐的数据域
 
-- `auth_*`: users, roles, permissions, refresh tokens, login logs
-- `model_*`: registry, versions, prompt templates, score profiles, power keywords
-- `task_*`: jobs, job steps, retry logs, experiment roots, experiment items
-- `asset_*`: images, prompts, scores, files, tags
-- `audit_*`: operation logs, API logs, task events, alerts, export records
+- `auth_*`：用户、角色、权限、刷新令牌、登录日志
+- `model_*`：模型注册、版本、Prompt 模板、评分配置、电力关键词
+- `task_*`：任务主表、步骤表、重试日志、实验主表、实验项
+- `asset_*`：图像、Prompt、评分、文件、标签
+- `audit_*`：操作日志、API 日志、任务事件、告警、导出记录
 
-### 5.3 Storage Strategy
+### 5.3 存储策略
 
-- MySQL stores structured business records.
-- Redis stores task queues, cache entries, and lightweight coordination state.
-- generated files are stored under runtime-controlled local directories
-- deployed runtime root is centered around `G:\electric-ai-runtime`
+- `MySQL` 用于存储结构化业务数据
+- `Redis` 用于存储任务流转、缓存与轻量协调状态
+- 图像与导出文件存储在运行时控制的本地目录
+- 运行时根目录统一落在 `G:\electric-ai-runtime`
 
-## 6. Legacy Capability Migration Strategy
+## 6. 旧能力迁移策略
 
-The final platform is not a greenfield design anymore. It evolves from a previous system that already had real model and frontend capabilities. The migration strategy is:
+最终平台不是从零开始的空白架构，而是在旧项目已有真实能力基础上的迁移与重构。最终迁移策略如下：
 
-1. Keep the new Go microservice structure.
-2. Move real generation and real scoring into `python-ai-service`.
-3. Rebuild the old frontend capabilities inside the new `web-console`.
-4. Persist images, prompts, scores, and task status through the new service boundaries.
-5. Preserve Windows-native operation as a first-class runtime path.
+1. 保留新的 Go 微服务结构，不回退到旧单体模式
+2. 把旧项目中的真实生成能力与真实评分能力迁入 `python-ai-service`
+3. 在新 `web-console` 中重建旧工作台、历史中心和模型中心能力
+4. 通过新的服务边界完成图片、Prompt、评分与任务状态持久化
+5. 继续把 Windows 原生运行作为一等运行模式
 
-This migration is important because the final platform must be more than a mocked vertical slice.
+这个迁移方向的意义在于，让平台不只是“mock 的垂直切片”，而是真正具备可运行的完整能力。
 
-## 7. Generation Design
+## 7. 图像生成设计
 
-### 7.1 Runtime Direction
+### 7.1 运行时方向
 
-The final deployed generation direction remains `Stable Diffusion 1.5` based for one practical reason: the target machine is a Windows laptop environment with `RTX 3060 Laptop GPU 6GB`, so deployment stability matters more than chasing larger base models.
+最终部署的生成模型仍然以 `Stable Diffusion 1.5` 体系为主。原因很直接：当前目标机器是 `RTX 3060 Laptop GPU 6GB` 的 Windows 本机环境，部署稳定性比盲目追求更大底模更重要。
 
-### 7.2 Specialized Electric Model
+### 7.2 电力专用生成模型
 
-The final model strategy is:
+最终模型路线如下：
 
-- build an electric-domain dataset from public and local power-scene images
-- fine-tune an SD1.5-based electric LoRA
-- merge the LoRA into a standalone deployable runtime model
-- register it as `sd15-electric-specialized`
+- 从公开电力图片和本地电力场景图片中整理电力行业数据集
+- 基于 `SD1.5` 训练电力行业 `LoRA`
+- 将 LoRA 合并为独立可部署模型
+- 在模型中心中注册为 `sd15-electric-specialized`
 
-This approach balances:
+这一方案兼顾了：
 
-- electric-domain specificity
-- trainability on limited hardware
-- deploy-time stability
-- compatibility with existing runtime code
+- 电力行业专属性
+- 小显存机器可训练性
+- 实际部署稳定性
+- 与现有运行时代码的兼容性
 
-### 7.3 Prompt-Library Design
+### 7.3 Prompt 库设计
 
-Prompt design follows a reusable layered pattern:
+Prompt 设计采用分层复用模式：
 
-- realism backbone
-- scene template
-- environment modifiers
-- camera and light modifiers
-- negative prompt constraints
+- 真实风格骨架
+- 场景模板
+- 环境修饰词
+- 光照与镜头修饰词
+- 负向 Prompt 约束
 
-Representative scene families:
+典型场景包括：
 
-- substation close-up
-- transmission-line aerial view
-- grid control room
-- wind farm
-- solar farm
-- hydro dam
-- night maintenance
+- 变电站特写
+- 输电线路航拍
+- 调度控制室
+- 风电场景
+- 光伏电站
+- 水电大坝
+- 夜间检修场景
 
-Prompt goals:
+Prompt 设计目标：
 
-- realistic materials and equipment structure
-- clean industrial composition
-- safety cues and believable engineering layout
-- reduced cartoon, CGI, and artifact drift
+- 突出设备结构、材质和工程逻辑
+- 维持工业摄影风格与整洁观感
+- 加强安全标识、施工规范和场景可信度
+- 降低动漫、CGI 与结构伪影偏移
 
-## 8. Scoring Design
+## 8. 评分模型设计
 
-### 8.1 Four Dimensions
+### 8.1 四维评分体系
 
-The final scoring model evaluates:
+平台最终采用四个核心维度对生成图像进行评价：
 
-- `text_consistency`
-- `composition_aesthetics`
-- `visual_fidelity`
-- `physical_plausibility`
+- `text_consistency` 文本一致性
+- `composition_aesthetics` 构图美观度
+- `visual_fidelity` 视觉保真度
+- `physical_plausibility` 物理合理性
 
-### 8.2 Scoring Runtime Structure
+### 8.2 评分运行时结构
 
-The platform keeps a layered scorer:
+平台采用分层评分结构：
 
-- advanced scorers first:
+- 高级评分器优先：
   - `ImageReward`
   - `LAION-Aesthetics`
   - `CLIP-IQA`
-- fallback scorer:
-  - pure `CLIP-IQA` flow
+- 基础回退评分器：
+  - 纯 `CLIP-IQA`
 
-This provides:
+这样设计的好处是：
 
-- stronger human-aligned evaluation when advanced models are available
-- predictable fallback behavior when heavyweight models fail to load
-- better demo stability on limited hardware
+- 高级模型可提供更接近人类主观偏好的判断
+- 重型模型加载失败时仍可回退输出稳定评分
+- 更适合当前机器条件下的演示与长期运行
 
-### 8.3 Electric Score V3 Direction
+### 8.3 Electric Score V3 演进方向
 
-The final scoring evolution path is `electric-score-v3`, which combines:
+最终评分演进方向为 `electric-score-v3`，其核心思路是结合：
 
-- teacher-model supervision for human-aligned quality signals
-- electric-component detection and rule constraints
-- lightweight student inference for deploy-time scoring
+- 强教师模型提供更接近人类偏好的监督信号
+- 电力部件检测与规则约束提供行业物理逻辑校验
+- 轻量学生模型承担部署时推理
 
-This means the platform does not rely only on generic aesthetic scoring. It also keeps domain-specific checks for:
+这意味着平台不会只依赖“通用美学评分”，而是保留电力行业特定约束，例如：
 
-- power-component presence
-- structural plausibility
-- cable behavior and equipment relationships
-- electric-scene physical logic
+- 电力部件是否出现
+- 结构关系是否合理
+- 电缆、塔架、叶片等是否符合常识
+- 电力场景是否满足基础物理逻辑
 
-### 8.4 Final Total-Score Strategy
+### 8.4 总分策略
 
-Recommended default total score:
+推荐默认总分计算方式如下：
 
 ```text
 total_score =
@@ -274,174 +288,174 @@ total_score =
   composition_aesthetics * 0.15
 ```
 
-## 9. Task and Workflow Design
+## 9. 任务与流程设计
 
-### 9.1 Generate Workflow
+### 9.1 图像生成流程
 
-1. user submits prompt and runtime parameters from the workbench
-2. `task-service` creates a generate job
-3. job is published to Redis Stream
-4. Python runtime consumes the job and runs generation
-5. asset metadata is persisted
-6. audit events are written
-7. a follow-up score job is created automatically
+1. 用户在工作台提交 Prompt 和运行参数
+2. `task-service` 创建生成任务
+3. 任务写入 Redis Stream
+4. Python 运行时消费任务并执行生成
+5. 图像元数据写入资产中心
+6. 审计事件写入审计中心
+7. 系统自动创建后续评分任务
 
-### 9.2 Score Workflow
+### 9.2 图像评分流程
 
-1. `task-service` creates a scoring job
-2. Python runtime runs the four-dimension scorer
-3. results are written to asset records
-4. score summaries and audit events become visible in the console
+1. `task-service` 创建评分任务
+2. Python 运行时执行四维评分
+3. 结果写入图像评分记录
+4. 分数摘要和审计事件在前端展示
 
-### 9.3 History Workflow
+### 9.3 历史中心流程
 
-The final history center design includes:
+最终历史中心设计包含：
 
-- real backend pagination
-- filter state reflected into query parameters
-- unchanged detail-drawer flow for record drill-down
-- reusable list-loading path instead of full eager history fetches
+- 真实后端分页
+- 筛选条件写入查询参数
+- 保留现有详情抽屉链路
+- 用分页加载替代一次性拉全量历史记录
 
-This keeps the history page scalable as data volume grows.
+这样可以保证历史中心随着数据量增长仍然可用。
 
-## 10. Final Web Console Design
+## 10. 最终 Web Console 设计
 
-### 10.1 Login Experience
+### 10.1 登录页
 
-The login page is finalized as an industrial control center style entrance:
+登录页最终采用工业控制中心风格：
 
-- left-side narrative zone for platform identity
-- right-side login cabin for the only entry point
-- deep blue steel background with copper-gold accents
-- platform-oriented wording instead of a generic admin login look
+- 左侧为平台叙事区
+- 右侧为登录舱
+- 背景采用深蓝钢质感配合铜金强调色
+- 文案强调平台入口感，而不是通用后台登录页
 
-### 10.2 Generation Workbench
+### 10.2 生成工作台
 
-The workbench remains the main operator page and must present:
+生成工作台是平台核心操作页面，必须展示：
 
-- model selection and prompt controls
-- task state feedback
-- score panel and radar summary
-- result preview with stable layout
+- 模型选择与 Prompt 配置
+- 任务状态反馈
+- 分数面板与雷达摘要
+- 结果预览
 
-A key final UX decision is the fixed preview frame:
+一个关键最终交互决策是固定预览框：
 
-- generated images stay inside the preview card
-- the central column no longer gets visually flooded by full-height images
-- users can still click to open a larger preview overlay
+- 生成后的图片必须收敛在预览卡片内部
+- 不再让中间区域被超大主图铺满
+- 用户仍可通过点击查看大图弹层
 
-### 10.3 Score Readability
+### 10.3 分数可读化
 
-Score presentation is finalized with:
+分数展示最终采用：
 
-- numeric score values
-- grade badges for the four dimensions only
-- quick visual differentiation of weak and strong results
+- 数值分数
+- 四维指标等级徽章
+- 明确区分强弱结果的视觉反馈
 
-Recommended mapping:
+推荐等级映射：
 
-- `0-30`: `E`
-- `30-50`: `D`
-- `50-70`: `C`
-- `70-85`: `B`
-- `85-100`: `A`
+- `0-30`：`E`
+- `30-50`：`D`
+- `50-70`：`C`
+- `70-85`：`B`
+- `85-100`：`A`
 
-### 10.4 Audit Readability
+### 10.4 审计可读化
 
-Audit presentation is finalized around a shared readable timeline approach:
+审计展示最终采用统一的可读时间线方案：
 
-- raw event names are mapped to readable Chinese titles
-- payload summaries are converted into Chinese descriptions
-- the same presentation logic is reused in generate, audit, and history detail surfaces
+- 将原始事件名翻译成中文标题
+- 将 `payload` 摘要整理成中文说明
+- 在生成页、审计页、历史详情中复用同一套展示逻辑
 
-This avoids the old “English event name + raw JSON dump” problem.
+这样可以彻底解决“英文事件名 + 原始 JSON”难以阅读的问题。
 
-### 10.5 Mobile Design
+### 10.5 手机端设计
 
-The final mobile design is a two-step result:
+手机端设计分两步完成：
 
-1. make every page actually usable on phones
-2. reduce visual heaviness so the phone UI feels like a light native console instead of compressed desktop cards
+1. 先让整个控制台在手机上真正能用
+2. 再把界面从“压缩版桌面后台”优化成“更像轻量原生控制台”
 
-The final mobile direction includes:
+最终移动端方向包括：
 
-- drawer-based secondary navigation
-- bottom navigation for major page switching
-- single-column mobile layouts
-- thinner cards and shorter modules
-- reduced chrome height
-- more useful first-screen density
+- 抽屉式次级导航
+- 底部主导航
+- 单列页面布局
+- 更薄的卡片和更短的模块
+- 更轻的顶部和底部壳层
+- 更高的首屏有效信息密度
 
-### 10.6 Responsive Principles
+### 10.6 响应式原则
 
-- desktop structure stays recognizable
-- no separate mobile site or route tree
-- functionality is preserved, not removed
-- layout changes are mostly done through responsive branches and scoped styling
+- 桌面端结构保持可识别，不大改
+- 不拆独立移动端站点
+- 不删功能，只改变信息组织方式
+- 主要通过响应式分支和局部样式实现布局切换
 
-## 11. Deployment and Runtime Design
+## 11. 部署与运行设计
 
-### 11.1 Windows Native Path
+### 11.1 Windows 原生运行
 
-Windows native operation remains a first-class deployment target because it is the main demo and development environment. The runtime should keep:
+Windows 原生运行仍然是一等部署路径，因为它是当前主要开发和答辩演示环境。运行时保持：
 
-- Python environment under `G:\miniconda3\envs\electric-ai-py310`
-- model and output storage under `G:\electric-ai-runtime`
-- service ports aligned with the current local workflow
+- Python 环境位于 `G:\miniconda3\envs\electric-ai-py310`
+- 模型和输出目录位于 `G:\electric-ai-runtime`
+- 本地服务端口与当前联调流程一致
 
-### 11.2 Docker Path
+### 11.2 Docker 运行
 
-Docker Compose remains the secondary standardized deployment path for:
+Docker Compose 保持为标准化补充部署路径，用于：
 
-- reproducible environment startup
-- demo environment packaging
-- service orchestration consistency
+- 可重复环境启动
+- 演示环境打包
+- 多服务协同启动
 
-## 12. Testing and Verification Strategy
+## 12. 测试与验证策略
 
-### 12.1 Backend
+### 12.1 后端
 
-- service-level unit tests
-- repository tests
-- pagination and filter behavior tests
-- task lifecycle tests
+- 服务层单元测试
+- Repository 测试
+- 分页和筛选行为测试
+- 任务生命周期测试
 
-### 12.2 Frontend
+### 12.2 前端
 
-- source-content and logic tests for responsive branches
-- focused component tests for result preview, score badges, and history detail
-- store tests for pagination and query-state behavior
+- 响应式分支与逻辑测试
+- 结果预览、分数徽章、历史详情等重点组件测试
+- 分页与查询状态相关 store 测试
 
-### 12.3 Runtime
+### 12.3 AI 运行时
 
-- real generation smoke tests
-- real scoring smoke tests
-- model availability checks
-- deployment-path verification for specialized models
+- 真实生成 smoke test
+- 真实评分 smoke test
+- 模型可用性检查
+- 专用模型部署路径验证
 
-## 13. Final Deliverable Summary
+## 13. 最终交付说明
 
-The final design is not just “platform architecture” anymore. It is the combined result of:
+这份最终设计文档不再只是“平台架构说明”，而是以下内容的统一收敛结果：
 
-- the original platform blueprint
-- the real-runtime migration plan
-- the specialized electric model strategy
-- the upgraded human-aligned scoring design
-- the web-console desktop polish
-- the mobile responsive and density refinements
-- the history center scalability upgrades
+- 最初的平台总体设计
+- 真实运行时迁移设计
+- 电力专用模型设计
+- 更贴近人类偏好的评分模型设计
+- Web Console 桌面端交互优化
+- 移动端响应式与薄卡片改版
+- 历史中心可扩展性优化
 
-## 14. Conclusion
+## 14. 结论
 
-This final design document serves as the single source of truth for Electric AI Platform.
+本文档是当前 Electric AI Platform 的唯一正式设计依据。
 
-It unifies:
+它统一定义了：
 
-- system architecture
-- runtime strategy
-- data boundaries
-- generation and scoring design
-- final web-console interaction model
-- deployment and verification direction
+- 系统总体架构
+- 运行时策略
+- 数据边界
+- 图像生成与评分设计
+- 最终 Web Console 交互模型
+- 部署与验证方向
 
-All previous intermediate spec and plan markdown files are superseded by this document and removed from `docs/superpowers`.
+此前位于 `docs/superpowers` 下的所有阶段性设计稿与实现计划，均已被本最终设计文档替代并删除。

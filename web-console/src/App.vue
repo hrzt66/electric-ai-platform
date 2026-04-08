@@ -36,6 +36,7 @@ body {
     radial-gradient(circle at top left, rgba(211, 164, 73, 0.14), transparent 22%),
     linear-gradient(180deg, #eff4fb 0%, #edf2f7 100%);
   color: var(--ea-text);
+  overflow-x: hidden;
 }
 
 button,
@@ -48,5 +49,11 @@ textarea {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  body {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
 }
 </style>

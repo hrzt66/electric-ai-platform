@@ -322,4 +322,15 @@ const recentEvents = computed(() => getRecentAuditEvents(props.auditEvents, 2))
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 768px) {
+  .progress-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .progress-badge {
+    justify-items: start;
+  }
+}
 </style>

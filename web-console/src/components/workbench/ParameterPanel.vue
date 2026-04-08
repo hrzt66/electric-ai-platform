@@ -221,9 +221,27 @@ const selectedScoringModel = computed(
   line-height: 1.45;
 }
 
+.panel--drawer {
+  height: auto;
+  min-height: 100%;
+  border-radius: 24px 24px 0 0;
+  box-shadow: none;
+}
+
 @media (max-width: 700px) {
   .grid-two {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .form {
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .panel {
+    padding: 14px;
   }
 }
 </style>

@@ -10,6 +10,7 @@ import ResultPreview from '../components/workbench/ResultPreview.vue'
 import ScoreRadar from '../components/workbench/ScoreRadar.vue'
 import { usePlatformStore } from '../stores/platform'
 import type { GenerateTaskRequest, ModelRecord, ScoreSummary } from '../types/platform'
+import { MOBILE_BREAKPOINT, getWorkbenchSections } from '../utils/mobile-layout'
 import { FRONTEND_DEFAULT_NEGATIVE_PROMPT, FRONTEND_DEFAULT_POSITIVE_PROMPT } from './generate-defaults'
 
 const FALLBACK_SCORING_MODELS: ModelRecord[] = [
@@ -45,6 +46,8 @@ const activeIndex = ref(0)
 const pollingInFlight = ref(false)
 const workbenchLoading = ref(false)
 const workbenchError = ref('')
+const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const parameterDrawerOpen = ref(false)
 let pollTimer: number | null = null
 
 // 生成表单与后端请求结构保持同名，减少提交时的字段映射成本。
@@ -63,6 +66,9 @@ const form = reactive<GenerateTaskRequest>({
 
 const activeAsset = computed(() => platformStore.currentAssets[activeIndex.value] ?? null)
 const generationModels = computed(() => platformStore.models.filter((item) => item.model_type === 'generation'))
+const isMobile = computed(() => viewportWidth.value <= MOBILE_BREAKPOINT)
+const workbenchSections = computed(() => getWorkbenchSections(viewportWidth.value))
+const showInlineControls = computed(() => !isMobile.value && workbenchSections.value[0] === 'controls')
 const scoringModels = computed(() => {
   const catalog = platformStore.models.filter(
     (item) => item.model_type === 'scoring' && item.model_name.startsWith('electric-score-'),
@@ -88,6 +94,13 @@ function stopPolling() {
   if (pollTimer !== null) {
     window.clearInterval(pollTimer)
     pollTimer = null
+  }
+}
+
+function syncViewport() {
+  viewportWidth.value = window.innerWidth
+  if (!isMobile.value) {
+    parameterDrawerOpen.value = false
   }
 }
 
@@ -206,16 +219,18 @@ async function bootstrapWorkbench() {
 }
 
 onMounted(() => {
+  window.addEventListener('resize', syncViewport)
   void bootstrapWorkbench()
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncViewport)
   stopPolling()
 })
 </script>
 
 <template>
-  <div class="workbench">
+  <div class="workbench" :class="{ 'workbench-mobile': isMobile }">
     <el-alert v-if="workbenchError" class="workbench-alert" :closable="false" type="warning" show-icon :title="workbenchError" />
 
     <template v-if="workbenchLoading">
@@ -226,6 +241,7 @@ onBeforeUnmount(() => {
 
     <template v-else>
       <ParameterPanel
+        v-if="showInlineControls"
         :form="form"
         :models="generationModels"
         :scoring-models="scoringModels"
@@ -241,6 +257,17 @@ onBeforeUnmount(() => {
           :task="platformStore.currentTask"
           @update:active-index="activeIndex = $event"
         />
+
+        <el-button
+          v-if="isMobile && workbenchSections.includes('controls')"
+          class="open-parameter-button"
+          type="primary"
+          plain
+          @click="parameterDrawerOpen = true"
+        >
+          打开参数面板
+        </el-button>
+
         <GenerationProgressCard :task="platformStore.currentTask" :audit-events="platformStore.currentTaskAudit" />
       </div>
 
@@ -283,6 +310,25 @@ onBeforeUnmount(() => {
           </template>
         </section>
       </div>
+
+      <el-drawer
+        v-if="isMobile && workbenchSections.includes('controls')"
+        v-model="parameterDrawerOpen"
+        class="parameter-drawer"
+        direction="btt"
+        size="88%"
+        append-to-body
+      >
+        <ParameterPanel
+          class="panel--drawer"
+          :form="form"
+          :models="generationModels"
+          :scoring-models="scoringModels"
+          :submitting="platformStore.submitting"
+          @submit="submit"
+          @fill-defaults="fillDefaults"
+        />
+      </el-drawer>
     </template>
   </div>
 </template>
@@ -293,6 +339,10 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(280px, 312px) minmax(0, 1fr) minmax(268px, 296px);
   gap: 16px;
   align-items: start;
+}
+
+.workbench-mobile {
+  grid-template-columns: 1fr;
 }
 
 .workbench-alert {
@@ -374,6 +424,21 @@ onBeforeUnmount(() => {
   padding-right: 4px;
 }
 
+.open-parameter-button {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 16px;
+}
+
+:deep(.parameter-drawer .el-drawer__header) {
+  margin-bottom: 0;
+  padding: 0;
+}
+
+:deep(.parameter-drawer .el-drawer__body) {
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
 @media (min-width: 981px) {
   .workbench {
     height: calc(100vh - 148px);
@@ -405,6 +470,21 @@ onBeforeUnmount(() => {
 
   .preview-column {
     grid-template-rows: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-column,
+  .side-column {
+    order: initial;
+  }
+
+  .status-card {
+    max-height: none;
   }
 }
 </style>

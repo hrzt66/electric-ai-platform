@@ -178,4 +178,20 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
 :deep(.el-image__wrapper) {
   border-radius: inherit;
 }
+
+@media (max-width: 768px) {
+  .preview-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .image-frame {
+    height: min(62vw, 320px);
+  }
+
+  .meta-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
 </style>

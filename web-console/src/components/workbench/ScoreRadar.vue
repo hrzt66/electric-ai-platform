@@ -270,4 +270,15 @@ const metricLabels = [
   background: #fee2e2;
   border-color: #fca5a5;
 }
+
+@media (max-width: 768px) {
+  .score-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .total {
+    text-align: left;
+  }
+}
 </style>

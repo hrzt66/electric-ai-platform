@@ -105,6 +105,7 @@ flowchart LR
 - 首次加载更慢
 - 对显存更敏感
 - 更依赖运行时的 offload 和显存释放策略
+- 在 `2026-04-08` 的当前实测机 `RTX 3060 Laptop GPU 6GB` 上，分片加载阶段退出，错误码为 `3221225477`
 
 推荐使用场景：
 
@@ -143,6 +144,28 @@ flowchart LR
 - `sd15-electric` 是稳定主力
 - `sd15-electric-specialized` 是行业增强路线
 - `unipic2-kontext` 是高质量复杂场景路线
+
+### 2.6 固定 Prompt 集实测对比（2026-04-08）
+
+本次已经基于 `web-console/src/views/generate-defaults.ts` 中的 `7` 条推荐 Prompt 做了真实生成与真实评分。生成参数固定为 `seed=42`、`steps=20`、`guidance_scale=7.5`、`512x512`。成功完成汇总的生成模型是 `sd15-electric` 与 `sd15-electric-specialized`；`unipic2-kontext` 因本机资源边界未纳入汇总。
+
+| 生成模型 | `electric-score-v1` 平均总分 | `electric-score-v2` 平均总分 | `electric-score-v3` 平均总分 | 平均单图耗时 |
+| --- | --- | --- | --- | --- |
+| `sd15-electric` | `67.67` | `40.05` | `58.70` | `7.33s` |
+| `sd15-electric-specialized` | `68.91` | `40.23` | `60.43` | `6.52s` |
+
+从固定 Prompt 集实测可以看到：
+
+- `sd15-electric-specialized` 在三套评分器下都略高于 `sd15-electric`
+- 在 `electric-score-v3` 下，`sd15-electric-specialized` 平均总分高出 `1.73`
+- 在 `electric-score-v3` 的 `7` 个 Prompt 中，`sd15-electric-specialized` 赢了 `4` 个
+- `sd15-electric-specialized` 在 `electric-score-v3` 下最大的增益来自 `physical_plausibility`，平均高出 `5.49`
+
+![固定 Prompt 集平均总分对比](assets/real-evaluation/charts/fixed-prompt-total-scores.png)
+
+![固定 Prompt 集平均生成耗时](assets/real-evaluation/charts/fixed-prompt-generation-time.png)
+
+![固定 Prompt 集样例拼图](assets/real-evaluation/charts/generated-sample-grid.png)
 
 ## 3. 评分模型与评分组件总览
 
@@ -194,6 +217,34 @@ flowchart LR
 
 - 平台不是只接入了通用评分器
 - 而是在向“电力专用评分模型”继续演进
+
+### 3.5 三套评分模型的实测读法差异
+
+固定 Prompt 集实测已经给出三套评分模型的真实耗时与相对排序：
+
+- `electric-score-v1` 平均评分耗时约 `19.26s/图`
+- `electric-score-v2` 平均评分耗时约 `0.22s/图`
+- `electric-score-v3` 平均评分耗时约 `4.56s/图`
+
+读结果时需要注意两点：
+
+1. `v1`、`v2`、`v3` 的绝对分值标尺没有完全对齐，更适合做“同一评分器下不同生成模型”的比较。
+2. `v3` 更适合回答“是否符合电力行业结构约束”，`v1` 更接近默认线上组合评分，`v2` 更适合说明自训练轻量评分器已经落地。
+
+### 3.6 `electric-score-v2` 量化误差（实测）
+
+`electric-score-v2` 已经把最终回归误差写入 `G:\electric-ai-runtime\models\scoring\electric-score-v2\metrics.json`。当前误差水平如下：
+
+| 维度 | MAE | RMSE |
+| --- | --- | --- |
+| `text_consistency` | `11.5880` | `19.8579` |
+| `visual_fidelity` | `5.4243` | `7.0638` |
+| `composition_aesthetics` | `2.9621` | `4.8258` |
+| `physical_plausibility` | `5.8959` | `8.0440` |
+
+其中 `composition_aesthetics` 的误差最低，而 `text_consistency` 仍然是最难学的维度，这也解释了为什么 `v2` 在绝对总分上看起来比 `v1 / v3` 更保守。
+
+![Electric Score V2 回归误差](assets/real-evaluation/charts/scoring-v2-regression-metrics.png)
 
 ## 4. 底层评分组件说明
 
@@ -328,7 +379,8 @@ flowchart TD
 
 ### 8.2 如果你要做最终展示图
 
-- 生成模型优先：`unipic2-kontext`
+- 在更高内存或已提前验证可加载的机器上，生成模型优先：`unipic2-kontext`
+- 在当前 `RTX 3060 Laptop GPU 6GB` 实测机上，更稳妥的最终展示路径是：`sd15-electric-specialized`
 - 评分模型优先：`electric-score-v1` 或更高阶的 `electric-score-v3`
 
 原因：

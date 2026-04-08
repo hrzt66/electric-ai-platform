@@ -8,8 +8,22 @@
 需要特别说明的是：
 
 - 文中所有“结构、参数、目录、脚本入口”均以当前仓库代码为准。
-- 文中部分折线图和柱状图用于展示训练阶段“应关注的变化趋势”或“论文展示模板”，标题里会明确标注“示意（非实测）”。
+- 文中新增的折线图、柱状图、对比图和样例拼图，均来自 `2026-04-08` 在当前工作区内完成的真实日志解析与固定 Prompt 集实测。
 - 当前仓库里，生成模型训练链路已经形成“数据准备 -> LoRA 训练 -> 权重合并 -> 验证出图”的完整闭环；评分模型训练链路目前更偏向“bundle 构造 + hybrid 运行时集成”，完整的大规模监督训练仍属于继续扩展空间。
+
+## 实测基线说明
+
+为了避免文档只停留在“方法描述”，本次已经基于当前仓库和本机运行时补充了真实实验基线：
+
+- 实测日期：`2026-04-08`
+- Prompt 集来源：`web-console/src/views/generate-defaults.ts` 中的 `RECOMMENDED_POSITIVE_PROMPTS`
+- Prompt 数量：`7`
+- 生成参数：`seed=42`、`steps=20`、`guidance_scale=7.5`、`512x512`
+- 生成模型：`sd15-electric`、`sd15-electric-specialized`、`unipic2-kontext`
+- 评分模型：`electric-score-v1`、`electric-score-v2`、`electric-score-v3`
+- 成功完成的生成模型：`sd15-electric`、`sd15-electric-specialized`
+- 失败记录：`unipic2-kontext` 在 `RTX 3060 Laptop GPU 6GB` 的当前实测机上于分片加载阶段退出，错误码 `3221225477`
+- 结果目录：`docs/assets/real-evaluation/tables/` 与 `docs/assets/real-evaluation/charts/`
 
 ## 1. 模型训练体系总览
 
@@ -147,7 +161,7 @@ flowchart LR
 | learning rate | `1e-4` |
 | lr scheduler | `cosine` |
 | warmup steps | `200` |
-| max train steps | `6000` |
+| max train steps | `8000` |
 | checkpointing steps | `500` |
 | validation epochs | `1` |
 | num validation images | `2` |
@@ -227,35 +241,43 @@ flowchart TD
 | 典型场景适配 | 可用 | 更偏电力设备、线路、站场 |
 | 部署形态 | 现成模型目录 | 独立专用部署目录 |
 
-### 3.10 生成模型训练趋势图
+### 3.10 生成模型训练过程图（实测）
 
-下面两张图用于论文或答辩中展示“训练中应关注的变化趋势”。它们是说明性图表，不代表当前仓库已经固化了真实实验日志数值。
+本节图表不再使用示意图，而是直接读取：
 
-```mermaid
-xychart-beta
-    title "生成模型训练阶段：领域拟合度变化示意（非实测）"
-    x-axis ["初始","500","1000","2000","4000","6000","合并后"]
-    y-axis "相对水平" 0 --> 100
-    line [35,45,54,67,79,86,88]
-```
+- `G:\electric-ai-runtime\training\generation\sd15-electric-specialized\session-logs\train-generation-20260407-183903.err.log`
+- `G:\electric-ai-runtime\training\generation\sd15-electric-specialized\session-logs\monitor-history.log`
 
-```mermaid
-xychart-beta
-    title "生成模型训练阶段：验证可用度变化示意（非实测）"
-    x-axis ["初始","500","1000","2000","4000","6000","合并后"]
-    y-axis "相对水平" 0 --> 100
-    line [40,48,56,63,74,82,84]
-```
+从运行日志可以确认，本次 `sd15-electric-specialized` 训练共执行了 `8000` 个优化步，监控日志覆盖时间为 `2026-04-07 18:46:07` 到 `2026-04-08 03:48:10`，总耗时约 `9.03` 小时。
 
-### 3.11 生成模型版本对比图
+![生成模型训练损失曲线（实测）](assets/real-evaluation/charts/generation-training-loss.png)
 
-```mermaid
-xychart-beta
-    title "生成模型版本对比：电力场景适配度示意（非实测）"
-    x-axis ["基础 SD1.5","sd15-electric","sd15-electric-specialized"]
-    y-axis "相对水平" 0 --> 100
-    bar [42,68,86]
-```
+![生成模型训练进度曲线（实测）](assets/real-evaluation/charts/generation-training-progress.png)
+
+另外，训练流程在评估目录下留下了固定验证 Prompt 的真实出图，可直接作为论文或答辩中的“训练后验证样例”：
+
+![生成模型验证样例（实测）](assets/real-evaluation/charts/generation-validation-grid.png)
+
+### 3.11 生成模型固定 Prompt 集对比（实测）
+
+固定 Prompt 集实测于 `2026-04-08` 完成，参数为 `seed=42`、`steps=20`、`guidance_scale=7.5`、`512x512`。当前成功完成统计的模型为 `sd15-electric` 与 `sd15-electric-specialized`；`unipic2-kontext` 在本机分片加载阶段退出，因此只在失败记录中保留，不纳入平均分汇总。
+
+| 生成模型 | `electric-score-v1` 平均总分 | `electric-score-v2` 平均总分 | `electric-score-v3` 平均总分 | 平均单图耗时 |
+| --- | --- | --- | --- | --- |
+| `sd15-electric` | `67.67` | `40.05` | `58.70` | `7.33s` |
+| `sd15-electric-specialized` | `68.91` | `40.23` | `60.43` | `6.52s` |
+
+从实测结果可以得到三点直接结论：
+
+1. `sd15-electric-specialized` 在三套评分器下都略高于 `sd15-electric`。
+2. 在更强调行业约束的 `electric-score-v3` 下，`sd15-electric-specialized` 提升最明显，平均总分高出 `1.73`。
+3. `sd15-electric-specialized` 的主要增益来自 `physical_plausibility` 和 `composition_aesthetics`，分别高出 `5.49` 和 `3.32`。
+
+![固定 Prompt 集平均总分对比（实测）](assets/real-evaluation/charts/fixed-prompt-total-scores.png)
+
+![固定 Prompt 集平均生成耗时（实测）](assets/real-evaluation/charts/fixed-prompt-generation-time.png)
+
+![固定 Prompt 集样例拼图（实测）](assets/real-evaluation/charts/generated-sample-grid.png)
 
 ### 3.12 训练命令
 
@@ -423,30 +445,56 @@ flowchart TD
 | 部署方式 | 直接依赖多个评分组件 | 以 bundle 为中心组织 |
 | 演进空间 | 适合默认上线 | 更适合论文和专用模型叙事 |
 
-### 4.10 评分模型趋势图
+### 4.10 评分模型训练图与实测结果
 
-同样，下面图表用于展示“训练和升级后的预期趋势”，是论文表达模板，不是当前仓库自动记录的真实数值。
+评分侧目前可以从三个真实来源拿到量化结果：
 
-```mermaid
-xychart-beta
-    title "评分模型升级：行业约束能力变化示意（非实测）"
-    x-axis ["electric-score-v1","electric-score-v2","electric-score-v3"]
-    y-axis "相对水平" 0 --> 100
-    bar [48,71,87]
-```
+1. `YOLO` 电力辅助检测器训练日志 `results.csv`
+2. `electric-score-v2` 的 `metrics.json`
+3. `2026-04-08` 固定 Prompt 集上的真实评分结果
 
-```mermaid
-xychart-beta
-    title "评分模型训练阶段：多维一致性提升示意（非实测）"
-    x-axis ["初始","阶段1","阶段2","阶段3","bundle导出"]
-    y-axis "相对水平" 0 --> 100
-    line [44,56,68,79,83]
-```
+先看 `YOLO` 辅助检测器训练过程。当前训练日志只保留了 `3` 个 epoch，但已经能够真实反映精度、召回率和损失走势：
+
+![YOLO 检测器指标曲线（实测）](assets/real-evaluation/charts/scoring-yolo-metrics.png)
+
+![YOLO 检测器损失曲线（实测）](assets/real-evaluation/charts/scoring-yolo-losses.png)
+
+最终一轮的关键指标为：
+
+- `precision = 0.6530`
+- `recall = 0.4353`
+- `mAP50 = 0.4744`
+- `mAP50-95 = 0.2303`
+
+再看 `electric-score-v2` 的回归误差。它已经将四个维度的最终误差写入了 `G:\electric-ai-runtime\models\scoring\electric-score-v2\metrics.json`：
+
+| 维度 | MAE | RMSE |
+| --- | --- | --- |
+| `text_consistency` | `11.5880` | `19.8579` |
+| `visual_fidelity` | `5.4243` | `7.0638` |
+| `composition_aesthetics` | `2.9621` | `4.8258` |
+| `physical_plausibility` | `5.8959` | `8.0440` |
+
+![Electric Score V2 回归误差（实测）](assets/real-evaluation/charts/scoring-v2-regression-metrics.png)
+
+最后是固定 Prompt 集上的真实评分耗时与读法差异：
+
+- `electric-score-v1` 平均评分耗时约 `19.26s/图`
+- `electric-score-v2` 平均评分耗时约 `0.22s/图`
+- `electric-score-v3` 平均评分耗时约 `4.56s/图`
+
+需要注意的是：`v1`、`v2`、`v3` 的绝对分值标尺并没有完全对齐，因此更适合做“同一评分器下不同生成模型的比较”，而不适合直接横向比较不同评分器的绝对总分高低。
 
 ### 4.11 评分训练命令
 
 ```powershell
 & 'G:\miniconda3\envs\electric-ai-py310\python.exe' python-ai-service/scripts/train_scoring_v3.py
+```
+
+如果你要复现实测图表，而不是只重建 bundle，可以直接运行：
+
+```powershell
+& 'G:\miniconda3\envs\electric-ai-py310\python.exe' python-ai-service/scripts/build_real_evaluation_assets.py
 ```
 
 当前命令执行后，主要输出：
@@ -493,7 +541,8 @@ xychart-beta
 推荐策略：
 
 - 日常联调优先：`sd15-electric`
-- 最终展示图优先：`unipic2-kontext`
+- 当前 6GB 单卡实测机上的最终展示优先：`sd15-electric-specialized`
+- 在更高内存或已提前验证可加载的机器上，可再尝试：`unipic2-kontext`
 - 行业专用实验优先：`sd15-electric-specialized`
 
 ### 5.2 评分模型使用
@@ -523,17 +572,19 @@ Docker GPU 更适合：
 - 容器化编排演示
 - 稳定复现统一环境
 
-## 6. 训练结果展示建议
+## 6. 当前已补充的真实结果
 
-如果你要把这份文档继续用于论文或答辩展示，建议后续补充以下真实内容：
+本次已经补充到仓库中的真实结果包括：
 
-- TensorBoard 截图
-- 不同步数下的验证出图
-- `sd15-electric` 与 `sd15-electric-specialized` 的对比图
-- `electric-score-v1 / v2 / v3` 的样例评分结果对比
-- 真实 loss 曲线和验证指标曲线
+- `sd15-electric-specialized` 训练日志解析图
+- 训练监控进度图
+- 训练后验证样例拼图
+- `YOLO` 辅助检测器真实指标与损失曲线
+- `electric-score-v2` 的真实 MAE / RMSE 柱状图
+- 固定 7 Prompt 集上的平均总分、平均耗时和样例拼图
+- `unipic2-kontext` 在当前实测机上的失败记录
 
-当前文档中的图表已经给出了展示结构，你后续可以直接把“示意图”换成真实实验图。
+因此，这份文档已经不再只是训练说明，而是同时具备“方法 + 真实结果 + 失败边界说明”的答辩材料属性。
 
 ## 7. 总结
 

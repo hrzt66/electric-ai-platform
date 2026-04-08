@@ -1,0 +1,25 @@
+{
+  "run_timestamp": "2026-04-09T00:12:45.306624+08:00",
+  "prompt_source": "E:\\毕业设计\\golang-毕业设计\\.worktrees\\electric-score-v2\\web-console\\src\\views\\generate-defaults.ts",
+  "generation_models_requested": [
+    "sd15-electric",
+    "sd15-electric-specialized",
+    "unipic2-kontext"
+  ],
+  "generation_models_completed": [
+    "sd15-electric",
+    "sd15-electric-specialized"
+  ],
+  "scoring_models_completed": [
+    "electric-score-v1",
+    "electric-score-v2",
+    "electric-score-v3"
+  ],
+  "seed": 42,
+  "steps": 20,
+  "guidance_scale": 7.5,
+  "width": 512,
+  "height": 512,
+  "benchmark_row_count": 42,
+  "failure_count": 1
+}

@@ -29,8 +29,7 @@
 - 模型介绍、对比与评分说明：[docs/model-introduction-and-scoring.md](docs/model-introduction-and-scoring.md)
 - 模型训练与使用说明：[docs/model-training-and-usage.md](docs/model-training-and-usage.md)
 - 项目函数说明：[docs/project-function-reference.md](docs/project-function-reference.md)
-- Windows 原生运行手册：[docs/windows-native-runbook.md](docs/windows-native-runbook.md)
-- Docker GPU 运行手册：[docs/docker-gpu-runbook.md](docs/docker-gpu-runbook.md)
+- Windows / Docker GPU 运行手册：[docs/windows-docker-gpu-runbook.md](docs/windows-docker-gpu-runbook.md)
 
 ## 项目亮点
 
@@ -40,6 +39,35 @@
 - 单机友好：针对 `RTX 3060 Laptop GPU 6GB` 这一类单卡环境做了模型加载、释放和运行策略优化。
 - 双运行形态：既支持 Windows 原生调试，也支持 Docker GPU 编排。
 - 前端可展示：提供登录页、生成工作台、历史中心、模型中心、任务审计等完整界面。
+
+## 2026-04-08 实测结果
+
+本仓库已经补充了基于真实运行时的固定 Prompt 集实测。测试基线如下：
+
+- Prompt 集来源：`web-console/src/views/generate-defaults.ts` 中的 `RECOMMENDED_POSITIVE_PROMPTS` 共 7 条
+- 生成参数：`seed=42`、`steps=20`、`guidance_scale=7.5`、`512x512`、每个 Prompt 生成 1 张图
+- 评分模型：`electric-score-v1`、`electric-score-v2`、`electric-score-v3`
+- 成功完成实测的生成模型：`sd15-electric`、`sd15-electric-specialized`
+- 当前实测机器：`RTX 3060 Laptop GPU 6GB`
+
+核心结论：
+
+- 在固定 7 Prompt 集上，`sd15-electric-specialized` 在 3 套评分器下都略高于 `sd15-electric`。
+- 在 `electric-score-v3` 下，`sd15-electric-specialized` 平均总分 `60.43`，高于 `sd15-electric` 的 `58.70`，提升 `1.73` 分。
+- 在 `electric-score-v3` 的 7 个 Prompt 中，`sd15-electric-specialized` 赢了 4 个；它最大的优势来自 `physical_plausibility`，平均高出 `5.49` 分。
+- 平均单图生成耗时上，`sd15-electric-specialized` 为 `6.52s`，快于 `sd15-electric` 的 `7.33s`。
+- `unipic2-kontext` 已在运行时注册，但在 `2026-04-08` 的这台 `RTX 3060 Laptop GPU 6GB` 机器上，分片加载阶段退出，错误码为 `3221225477`，因此没有纳入最终汇总图。
+
+![固定 Prompt 集平均总分对比](docs/assets/real-evaluation/charts/fixed-prompt-total-scores.png)
+
+![固定 Prompt 集样例拼图](docs/assets/real-evaluation/charts/generated-sample-grid.png)
+
+更完整的原始结果、失败记录和图表可以直接查看：
+
+- `docs/assets/real-evaluation/tables/benchmark-results.csv`
+- `docs/assets/real-evaluation/tables/benchmark-summary.csv`
+- `docs/assets/real-evaluation/tables/benchmark-failures.json`
+- `docs/assets/real-evaluation/charts/`
 
 ## 核心能力
 
@@ -196,7 +224,7 @@ powershell -ExecutionPolicy Bypass -File scripts/windows/start-platform.ps1
 powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1
 ```
 
-详细说明见：[docs/windows-native-runbook.md](docs/windows-native-runbook.md)
+详细说明见：[docs/windows-docker-gpu-runbook.md](docs/windows-docker-gpu-runbook.md)
 
 ### 2. Docker GPU 运行
 
@@ -206,7 +234,7 @@ powershell -ExecutionPolicy Bypass -File scripts/docker/download-models.ps1 -Mod
 powershell -ExecutionPolicy Bypass -File scripts/docker/smoke-test.ps1 -ModelName unipic2-kontext
 ```
 
-详细说明见：[docs/docker-gpu-runbook.md](docs/docker-gpu-runbook.md)
+详细说明见：[docs/windows-docker-gpu-runbook.md](docs/windows-docker-gpu-runbook.md)
 
 ## 默认访问地址
 
@@ -296,7 +324,7 @@ electric-ai-platform
 ├─ web-console/                 # Vue 3 前端工作台
 ├─ scripts/                     # Windows / Docker 启动与验证脚本
 ├─ deploy/                      # Docker、数据库初始化、镜像构建文件
-├─ docs/                        # 运行手册、迁移计划、设计文档
+├─ docs/                        # 模型说明、训练说明、函数说明与运行手册
 └─ storage/                     # 本地存储目录占位
 ```
 
@@ -504,7 +532,7 @@ git push -u origin <当前分支名>
 
 ## 进一步文档
 
-- [模型介绍、对比与评分说明](docs/models/model-introduction-and-scoring.md)
-- [Windows 原生运行手册](docs/runtime/windows-native-runbook.md)
-- [Docker GPU 运行手册](docs/runtime/docker-gpu-runbook.md)
-- [迁移执行计划](docs/superpowers/plans/2026-04-05-legacy-capability-migration.md)
+- [模型介绍、对比与评分说明](docs/model-introduction-and-scoring.md)
+- [模型训练与使用说明](docs/model-training-and-usage.md)
+- [项目函数说明](docs/project-function-reference.md)
+- [Windows / Docker GPU 运行手册](docs/windows-docker-gpu-runbook.md)

@@ -10,6 +10,7 @@ const platformStore = usePlatformStore()
 const drawerVisible = ref(false)
 const historyLoading = ref(false)
 const historyError = ref('')
+const filtersExpanded = ref(true)
 
 const filters = reactive({
   promptKeyword: '',
@@ -73,7 +74,7 @@ onMounted(() => {
     <el-skeleton v-if="historyLoading" class="page-skeleton" animated :rows="8" />
 
     <template v-else>
-      <HistoryFilters :filters="filters" @reset="resetFilters" />
+      <HistoryFilters :filters="filters" :expanded="filtersExpanded" @reset="resetFilters" @toggle="filtersExpanded = !filtersExpanded" />
       <HistoryTable :items="filteredItems" :loading="platformStore.loadingHistory" @open="openDetail" />
       <HistoryDetailDrawer v-model:visible="drawerVisible" :detail="platformStore.selectedAssetDetail" :audit-events="platformStore.currentTaskAudit" />
     </template>

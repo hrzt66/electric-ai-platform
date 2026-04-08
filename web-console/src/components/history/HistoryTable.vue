@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+
 import { buildImageUrl } from '../../api/platform'
 import type { AssetHistoryItem } from '../../types/platform'
+import { shouldUseHistoryCards } from '../../utils/mobile-layout'
 
-defineProps<{
+const props = defineProps<{
   items: AssetHistoryItem[]
   loading: boolean
 }>()
@@ -10,6 +13,21 @@ defineProps<{
 const emit = defineEmits<{
   open: [item: AssetHistoryItem]
 }>()
+
+const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const isMobile = computed(() => shouldUseHistoryCards(viewportWidth.value))
+
+function syncViewport() {
+  viewportWidth.value = window.innerWidth
+}
+
+onMounted(() => {
+  window.addEventListener('resize', syncViewport)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncViewport)
+})
 </script>
 
 <template>
@@ -19,10 +37,29 @@ const emit = defineEmits<{
         <p class="table-eyebrow">资产结果</p>
         <h2 class="table-title">历史中心</h2>
       </div>
-      <el-tag type="info">共 {{ items.length }} 条</el-tag>
+      <el-tag type="info">共 {{ props.items.length }} 条</el-tag>
     </div>
 
-    <el-table :data="items" stripe v-loading="loading" class="history-table" empty-text="暂无历史资产" @row-click="emit('open', $event)">
+    <div v-if="isMobile" class="history-cards">
+      <article v-for="row in props.items" :key="row.id" class="history-card" @click="emit('open', row)">
+        <img class="thumb history-card__thumb" :src="buildImageUrl(row.file_path)" :alt="row.image_name" />
+        <div class="history-card__body">
+          <strong>{{ row.image_name }}</strong>
+          <p>{{ row.positive_prompt }}</p>
+          <div class="history-card__meta">
+            <span>{{ row.model_name }}</span>
+            <span>总分 {{ row.total_score.toFixed(2) }}</span>
+            <span>{{ row.status }}</span>
+            <span>{{ row.created_at }}</span>
+          </div>
+          <el-button link type="primary" @click.stop="emit('open', row)">查看详情</el-button>
+        </div>
+      </article>
+
+      <el-empty v-if="!props.loading && props.items.length === 0" description="暂无历史资产" />
+    </div>
+
+    <el-table v-else :data="props.items" stripe v-loading="props.loading" class="history-table" empty-text="暂无历史资产" @row-click="emit('open', $event)">
       <el-table-column label="预览" width="110">
         <template #default="{ row }">
           <img class="thumb" :src="buildImageUrl(row.file_path)" :alt="row.image_name" />
@@ -91,6 +128,21 @@ const emit = defineEmits<{
   cursor: pointer;
 }
 
+.history-cards {
+  display: grid;
+  gap: 14px;
+}
+
+.history-card {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
 .thumb {
   width: 72px;
   height: 72px;
@@ -99,16 +151,51 @@ const emit = defineEmits<{
   background: #edf2f7;
 }
 
-.prompt-cell {
-  display: grid;
-  gap: 4px;
+.history-card__thumb {
+  width: 88px;
+  height: 88px;
 }
 
-.prompt-cell span {
+.prompt-cell,
+.history-card__body {
+  display: grid;
+  gap: 6px;
+}
+
+.prompt-cell span,
+.history-card__body p {
   color: #53606f;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.history-card__body strong,
+.history-card__body p {
+  margin: 0;
+}
+
+.history-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 600px) {
+  .table-header {
+    flex-direction: column;
+  }
+
+  .history-card {
+    grid-template-columns: 1fr;
+  }
+
+  .history-card__thumb {
+    width: 100%;
+    height: 180px;
+  }
 }
 </style>

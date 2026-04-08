@@ -8,10 +8,12 @@ type HistoryFiltersState = {
 
 defineProps<{
   filters: HistoryFiltersState
+  expanded: boolean
 }>()
 
 const emit = defineEmits<{
   reset: []
+  toggle: []
 }>()
 </script>
 
@@ -22,10 +24,15 @@ const emit = defineEmits<{
         <p class="filters-eyebrow">历史检索</p>
         <h2 class="filters-title">多条件筛选</h2>
       </div>
-      <el-button plain @click="emit('reset')">重置筛选</el-button>
+      <div class="filters-actions">
+        <button class="filters-toggle" type="button" @click="emit('toggle')">
+          {{ expanded ? '收起筛选' : '展开筛选' }}
+        </button>
+        <el-button plain @click="emit('reset')">重置筛选</el-button>
+      </div>
     </div>
 
-    <div class="grid">
+    <div class="grid" :class="{ collapsed: !expanded }">
       <el-form-item label="提示词关键词">
         <el-input v-model="filters.promptKeyword" placeholder="按提示词或图片名筛选" clearable />
       </el-form-item>
@@ -62,6 +69,12 @@ const emit = defineEmits<{
   margin-bottom: 18px;
 }
 
+.filters-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .filters-eyebrow,
 .filters-title {
   margin: 0;
@@ -86,9 +99,36 @@ const emit = defineEmits<{
   gap: 16px;
 }
 
+.filters-toggle {
+  display: none;
+  border: 1px solid rgba(20, 71, 166, 0.16);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #f8fbff;
+  color: #1447a6;
+  cursor: pointer;
+}
+
 @media (max-width: 900px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .filters-header,
+  .filters-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters-toggle {
+    display: inline-flex;
+    justify-content: center;
+  }
+
+  .grid.collapsed {
+    display: none;
   }
 }
 

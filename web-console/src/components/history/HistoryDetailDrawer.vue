@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import AuditTimeline from '../audit/AuditTimeline.vue'
 import { buildImageUrl } from '../../api/platform'
@@ -15,6 +15,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:visible': [value: boolean]
 }>()
+
+const viewportWidth = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const drawerSize = computed(() => (viewportWidth.value <= 768 ? '100%' : '720px'))
 
 const scores = computed(() => {
   if (!props.detail) {
@@ -33,10 +36,22 @@ const scores = computed(() => {
     { label: '总分', value: props.detail.score.total_score },
   ]
 })
+
+function syncViewport() {
+  viewportWidth.value = window.innerWidth
+}
+
+onMounted(() => {
+  window.addEventListener('resize', syncViewport)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncViewport)
+})
 </script>
 
 <template>
-  <el-drawer :model-value="visible" size="720px" @update:model-value="emit('update:visible', $event)">
+  <el-drawer :model-value="visible" :size="drawerSize" @update:model-value="emit('update:visible', $event)">
     <template #header>
       <div class="drawer-header">
         <div>
@@ -195,9 +210,23 @@ const scores = computed(() => {
   color: #17202b;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
+  .drawer-header {
+    flex-direction: column;
+  }
+
+  .drawer-image {
+    min-height: 220px;
+  }
+
   .score-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .score-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -1,72 +1,139 @@
 # 模型训练与使用说明
 
-本文档用于说明当前项目中的模型训练方法、训练数据来源、可使用算法、输出目录和实际使用方式。文档重点覆盖两条路线：
+本文档用于详细说明当前项目中的模型训练方法、训练数据来源、训练前后改动、模型版本对比、使用方式和可视化图表示意。文档覆盖两条主线：
 
 1. 电力行业专用生成模型训练路线
-2. 电力行业评分模型训练与部署路线
+2. 电力行业多维评分模型训练与部署路线
+
+需要特别说明的是：
+
+- 文中所有“结构、参数、目录、脚本入口”均以当前仓库代码为准。
+- 文中部分折线图和柱状图用于展示训练阶段“应关注的变化趋势”或“论文展示模板”，标题里会明确标注“示意（非实测）”。
+- 当前仓库里，生成模型训练链路已经形成“数据准备 -> LoRA 训练 -> 权重合并 -> 验证出图”的完整闭环；评分模型训练链路目前更偏向“bundle 构造 + hybrid 运行时集成”，完整的大规模监督训练仍属于继续扩展空间。
 
 ## 1. 模型训练体系总览
 
 当前项目的训练体系分为两部分：
 
-- 生成模型训练：围绕 `sd15-electric-specialized` 构建电力行业专用生成模型
-- 评分模型训练：围绕 `electric-score-v2` 与 `electric-score-v3` 构建电力行业多维评分模型
+- 生成模型训练
+  面向 `sd15-electric-specialized`
+- 评分模型训练
+  面向 `electric-score-v2` 与 `electric-score-v3`
 
 ```mermaid
 flowchart LR
-    A["原始数据集"] --> B["清洗 / 去重 / 标注整理"]
+    A["原始图像数据"] --> B["扫描 / 去重 / 补 caption"]
     B --> C1["生成模型训练"]
-    B --> C2["评分模型训练"]
+    B --> C2["评分模型训练 / bundle 构造"]
     C1 --> D1["sd15-electric-specialized"]
-    C2 --> D2["electric-score-v2 / v3"]
-    D1 --> E["Python Runtime"]
-    D2 --> E
-    E --> F["Web Console / Task Pipeline"]
+    C2 --> D2["electric-score-v2 / electric-score-v3"]
+    D1 --> E["Python 生成运行时"]
+    D2 --> F["Python 评分运行时"]
+    E --> G["任务执行"]
+    F --> G
 ```
 
-## 2. 生成模型训练方法
+## 2. 训练路线与版本变化
 
-### 2.1 训练目标
+### 2.1 生成模型版本变化
 
-生成模型训练的目标是在 `Stable Diffusion 1.5` 路线上得到一个更偏电力行业场景的专用模型，用于提高以下场景的生成效果：
+当前项目中的生成模型不是一开始就直接训练成“电力专用模型”的，而是经历了从基础模型到平台主力模型再到电力专用模型的演进。
+
+| 阶段 | 模型 | 主要用途 | 训练/改动特点 |
+| --- | --- | --- | --- |
+| 第一阶段 | `runwayml/stable-diffusion-v1-5` | 通用底模 | 作为基础模型来源 |
+| 第二阶段 | `sd15-electric` | 当前平台默认主力模型 | 已适配平台运行时，适合日常联调 |
+| 第三阶段 | `sd15-electric-specialized` | 电力行业专用增强模型 | 基于电力数据集做 LoRA 微调并合并部署 |
+
+### 2.2 评分模型版本变化
+
+评分模型也不是固定不变的，当前有明显的版本演进路线：
+
+| 阶段 | 模型 | 特点 | 当前状态 |
+| --- | --- | --- | --- |
+| 第一阶段 | `electric-score-v1` | 默认组合评分链路，依赖多组件协同 | 已投入使用 |
+| 第二阶段 | `electric-score-v2` | 自训练评分 bundle 路线 | 已支持运行时接入 |
+| 第三阶段 | `electric-score-v3` | hybrid 路线，强调教师模型和行业约束 | 已支持 bundle 构造与运行时接入 |
+
+### 2.3 训练时真正发生的“更改”
+
+这是答辩里最值得强调的一点。训练模型不是简单换个名字，而是对以下内容做了改变：
+
+#### 生成模型训练时的变化
+
+- 从“通用底模直接推理”变成“电力场景 LoRA 微调后再部署”
+- 数据从通用图像转向电力行业场景图像
+- Prompt 验证从泛化文本改成电力行业典型场景验证
+- 输出从“运行时临时加载模型”变成“独立部署目录下的完整模型”
+
+#### 评分模型训练时的变化
+
+- 从默认组合评分链路转向自训练 bundle / hybrid 路线
+- 从只依赖通用图文质量模型，扩展到引入电力设备类别与检测辅助特征
+- 从单纯给分，扩展到更适合行业约束、多维度判断和等级划分
+
+## 3. 生成模型训练说明
+
+### 3.1 训练目标
+
+生成模型训练的目标是构建一个更偏电力行业场景的专用模型，使其在以下图像生成任务上比基础 SD1.5 更贴近电力行业语境：
 
 - 变电站
 - 输电线路
 - 风电场
 - 光伏场站
 - 水电设施
-- 电力巡检与工业设备特写
+- 电力巡检
+- 设备特写
 
-当前输出模型名为：
+最终输出模型名为：
 
 - `sd15-electric-specialized`
 
-输出目录为：
+最终部署目录为：
 
 - `G:\electric-ai-runtime\models\generation\sd15-electric-specialized`
 
-### 2.2 使用算法
+### 3.2 基础模型与改动点
 
-当前生成模型训练路线使用的核心算法和工程方法包括：
+根据 `python-ai-service/training/generation/config.py`，生成训练路线的基础模型是：
+
+- `runwayml/stable-diffusion-v1-5`
+
+但在实际训练命令中，代码会优先检查本地是否已有：
+
+- `G:\electric-ai-runtime\models\generation\sd15-electric`
+
+如果本地目录已存在且非空，则优先基于它继续训练；否则回退到 Hugging Face 的 `runwayml/stable-diffusion-v1-5`。
+
+这意味着训练时的关键改动有两种来源：
+
+1. 通用 SD1.5 -> 电力专用 LoRA 微调
+2. 现有 `sd15-electric` -> 更进一步的电力专用增强训练
+
+### 3.3 使用算法
+
+当前生成模型训练使用的核心算法和工程方法包括：
 
 - `Stable Diffusion 1.5`
-- `LoRA` 微调
-- `diffusers` 训练脚本
-- `FP16 mixed precision`
+- `LoRA`
+- `diffusers` 官方 `train_text_to_image_lora.py`
+- `mixed precision fp16`
 - `cosine` 学习率调度
 - `gradient checkpointing`
-- 训练后权重合并
+- LoRA 权重合并部署
+- 基于固定 Prompt 的验证出图
 
 其中最关键的算法路线是：
 
-1. 以 `runwayml/stable-diffusion-v1-5` 或本地 `sd15-electric` 为基础模型
-2. 使用 `LoRA` 对电力行业图像进行低秩微调
-3. 训练结束后将 LoRA 权重合并到独立模型目录
-4. 输出为平台可直接部署的完整模型
+1. 使用基础 SD1.5 权重
+2. 使用电力场景图像进行 LoRA 微调
+3. 训练结束后合并 LoRA 权重
+4. 输出为平台可直接加载的完整模型目录
 
-### 2.3 训练超参数
+### 3.4 训练超参数
 
-根据 `python-ai-service/training/generation/config.py`，当前训练配置如下：
+当前生成训练配置如下：
 
 | 参数 | 当前值 |
 | --- | --- |
@@ -82,54 +149,47 @@ flowchart LR
 | warmup steps | `200` |
 | max train steps | `6000` |
 | checkpointing steps | `500` |
+| validation epochs | `1` |
+| num validation images | `2` |
 | mixed precision | `fp16` |
 | gradient checkpointing | `true` |
 | random flip | `true` |
 | center crop | `true` |
 | seed | `42` |
 
-### 2.4 训练数据来源
+### 3.5 生成训练数据来源
 
-生成模型训练数据来自三个来源入口：
+当前代码里，生成训练数据从三类目录汇总：
 
-- `public_roots`
-  公开电力图像数据集目录
-- `local_roots`
-  本地旧项目中的电力场景图片
-- `external_roots`
-  外部补充图片目录
+| 数据来源 | 代码入口 | 作用 |
+| --- | --- | --- |
+| 公开数据集 | `public_roots` | 提供通用电力场景样本 |
+| 本地旧项目数据 | `local_roots` | 提供已有电力题材图像素材 |
+| 外部补充数据 | `external_roots` | 扩展特定场景样本 |
 
-当前脚本里，`prepare_generation_v3_dataset.py` 默认会优先使用：
+默认准备脚本 `prepare_generation_v3_dataset.py` 中，优先使用：
 
 - `G:\electric-ai-runtime\datasets\external`
 - `E:\毕业设计\源代码\Project\static`
 
-### 2.5 数据处理流程
+### 3.6 生成训练数据处理流程
 
-生成训练数据的预处理流程如下：
+当前代码里的数据处理逻辑非常明确，核心流程如下：
 
 ```mermaid
 flowchart TD
-    A["public / local / external 图像目录"] --> B["scan_image_roots 扫描图片"]
-    B --> C["按后缀和文件大小过滤"]
+    A["图像目录扫描"] --> B["按图片后缀过滤"]
+    B --> C["按文件大小过滤空文件"]
     C --> D["SHA-256 指纹去重"]
-    D --> E["根据文件名和路径生成 stub caption"]
-    E --> F["生成 raw_manifest.jsonl"]
-    F --> G["导出 curated 数据集"]
-    G --> H["生成 metadata.jsonl"]
-    H --> I["进入 LoRA 训练"]
+    D --> E["根据路径和文件名自动补 caption"]
+    E --> F["写入 raw_manifest.jsonl"]
+    F --> G["导出 curated/images + metadata.jsonl"]
+    G --> H["供 LoRA 训练脚本直接读取"]
 ```
 
-### 2.6 数据清洗方法
+### 3.7 自动 caption 规则
 
-当前数据处理方法主要包括：
-
-- 后缀过滤：仅保留 `.png`、`.jpg`、`.jpeg`、`.webp`、`.bmp`
-- 空文件过滤：跳过大小为 `0` 的文件
-- 指纹去重：通过 `SHA-256` 计算文件指纹，去除重复样本
-- caption 补全：根据路径和文件名中的关键词自动补生成初始描述
-
-典型自动识别关键词包括：
+当前 caption 不是靠手工逐张标注生成，而是通过路径、文件名和关键词自动补生成初始描述。当前代码里已包含的典型识别词包括：
 
 - `substation`
 - `transformer`
@@ -140,21 +200,64 @@ flowchart TD
 - `wind turbine`
 - `solar panel`
 
-### 2.7 训练流程
+自动补充的目标不是生成最终最优 Prompt，而是给训练提供“最小可用描述”。
+
+### 3.8 生成模型训练主流程
 
 ```mermaid
 flowchart TD
-    A["prepare_generation_training_workspace"] --> B["生成 raw manifest"]
-    B --> C["导出 curated dataset"]
-    C --> D["下载/复用 diffusers LoRA 训练脚本"]
-    D --> E["生成 training_plan.json"]
-    E --> F["run_lora_training"]
-    F --> G["merge_lora_weights"]
-    G --> H["evaluate_generation_model"]
-    H --> I["输出最终模型目录"]
+    A["prepare_generation_training_workspace"] --> B["加载 raw manifest"]
+    B --> C["按 max_train_samples 截断"]
+    C --> D["导出 curated dataset"]
+    D --> E["下载或复用 diffusers LoRA 训练脚本"]
+    E --> F["构建 train_command"]
+    F --> G["run_lora_training"]
+    G --> H["merge_lora_weights"]
+    H --> I["evaluate_generation_model"]
+    I --> J["输出 merged model + evaluation_report.json"]
 ```
 
-### 2.8 训练命令
+### 3.9 生成模型训练前后对比
+
+| 对比项 | 基础 SD1.5 / `sd15-electric` | `sd15-electric-specialized` |
+| --- | --- | --- |
+| 数据语义 | 偏通用或已有平台主力数据 | 明确加入电力行业专用数据 |
+| 训练方式 | 直接推理或已有主力模型 | LoRA 微调 + 合并 |
+| 行业专属性 | 中等 | 更强 |
+| 典型场景适配 | 可用 | 更偏电力设备、线路、站场 |
+| 部署形态 | 现成模型目录 | 独立专用部署目录 |
+
+### 3.10 生成模型训练趋势图
+
+下面两张图用于论文或答辩中展示“训练中应关注的变化趋势”。它们是说明性图表，不代表当前仓库已经固化了真实实验日志数值。
+
+```mermaid
+xychart-beta
+    title "生成模型训练阶段：领域拟合度变化示意（非实测）"
+    x-axis ["初始","500","1000","2000","4000","6000","合并后"]
+    y-axis "相对水平" 0 --> 100
+    line [35,45,54,67,79,86,88]
+```
+
+```mermaid
+xychart-beta
+    title "生成模型训练阶段：验证可用度变化示意（非实测）"
+    x-axis ["初始","500","1000","2000","4000","6000","合并后"]
+    y-axis "相对水平" 0 --> 100
+    line [40,48,56,63,74,82,84]
+```
+
+### 3.11 生成模型版本对比图
+
+```mermaid
+xychart-beta
+    title "生成模型版本对比：电力场景适配度示意（非实测）"
+    x-axis ["基础 SD1.5","sd15-electric","sd15-electric-specialized"]
+    y-axis "相对水平" 0 --> 100
+    bar [42,68,86]
+```
+
+### 3.12 训练命令
 
 只准备训练工作区：
 
@@ -168,90 +271,93 @@ flowchart TD
 & 'G:\miniconda3\envs\electric-ai-py310\python.exe' python-ai-service/scripts/train_generation_v3.py --max-train-samples 500
 ```
 
-正式训练并输出模型：
+正式训练：
 
 ```powershell
 & 'G:\miniconda3\envs\electric-ai-py310\python.exe' python-ai-service/scripts/train_generation_v3.py
 ```
 
-### 2.9 训练输出
+### 3.13 生成模型训练输出
 
-训练完成后会产出：
+训练完成后，典型输出包括：
 
 - `training_plan.json`
 - `lora-output/`
 - 合并后的最终模型目录
-- 验证生成结果目录
+- `evaluation/validation_*.png`
+- `evaluation_report.json`
 
-最终用于部署的模型应放在：
+相关训练目录在：
 
+- `G:\electric-ai-runtime\training\generation\sd15-electric-specialized`
 - `G:\electric-ai-runtime\models\generation\sd15-electric-specialized`
 
-## 3. 评分模型训练方法
+## 4. 评分模型训练说明
 
-### 3.1 训练目标
+### 4.1 评分训练目标
 
-评分模型训练的目标是构建一个比默认组合评分链路更具电力行业专属性的评分模型，使系统不仅能判断“图是否清晰”，还能判断：
+评分模型训练的目标是让平台不仅能评价“图片是否好看”，还可以评价：
 
-- 图是否贴合 Prompt
-- 电力设备是否出现
-- 结构关系是否合理
-- 是否满足电力行业场景常识
+- 是否符合 Prompt
+- 是否符合电力行业结构逻辑
+- 是否具有工程上可信的部件关系
+- 是否具有较好的展示观感
 
-当前评分模型路线包括：
+### 4.2 评分算法体系
 
-- `electric-score-v2`
-- `electric-score-v3`
-
-### 3.2 使用算法
-
-当前评分模型涉及的算法和模型包括：
+当前评分体系使用的算法和模型包括：
 
 - `ImageReward`
 - `CLIP-IQA`
 - `Aesthetic Predictor`
 - `YOLO` 辅助检测
 - `EfficientNet-B0`
-- `EmbeddingBag` Prompt 编码
-- 多头回归输出四维评分
-- hybrid teacher-student 设计思路
+- `EmbeddingBag`
+- 多头回归网络
+- hybrid teacher-student 设计
 
-其中 `power_score_runtime.py` 中的 `FourDimScoreModel` 使用了以下结构：
+### 4.3 默认评分路线 `electric-score-v1`
 
-- 图像 backbone：`EfficientNet-B0`
-- Prompt 编码：`EmbeddingBag`
-- 检测特征编码：全连接 + `SiLU`
-- 融合网络：多层 `MLP`
-- 输出头：四个维度各自一个回归 head
+`electric-score-v1` 不是一个单一大模型，而是一条默认评分链路：
 
-### 3.3 评分模型结构图
+- `ImageReward` 负责文本一致性
+- `CLIP-IQA` 负责视觉保真和物理合理性基础判断
+- `Aesthetic Predictor` 负责构图美学
+- `ScoringService` 负责总分校准与汇总
 
-```mermaid
-flowchart LR
-    Image["图像输入"] --> CNN["EfficientNet-B0 特征提取"]
-    Prompt["Prompt"] --> Emb["EmbeddingBag 编码"]
-    Det["YOLO 检测结果"] --> YoloEnc["检测特征编码"]
-    CNN --> Fuse["融合层 MLP"]
-    Emb --> Fuse
-    YoloEnc --> Fuse
-    Fuse --> H1["visual_fidelity"]
-    Fuse --> H2["text_consistency"]
-    Fuse --> H3["physical_plausibility"]
-    Fuse --> H4["composition_aesthetics"]
-```
+它的优势在于：
 
-### 3.4 评分训练配置
+- 结构清晰
+- 容易解释
+- 容易调试
 
-根据 `python-ai-service/training/scoring/config.py`，当前主要配置如下：
+### 4.4 `electric-score-v2` 与 `electric-score-v3`
 
-| 参数 | 当前值 |
+当前代码里已经支持：
+
+- `electric-score-v2`
+- `electric-score-v3`
+
+这两条路线的重要改动点是：
+
+- 从“多组件直接组合打分”转向“bundle 化的评分模型”
+- 引入电力设备类别信息
+- 引入检测器辅助特征
+- 为后续自训练评分模型保留完整运行时接口
+
+### 4.5 `electric-score-v3` 当前配置
+
+根据 `training/scoring/config.py`，当前 `electric-score-v3` 配置为：
+
+| 项目 | 当前值 |
 | --- | --- |
 | runtime_type | `hybrid` |
 | bundle_name | `electric-score-v3` |
 | source_detector_bundle_name | `electric-score-v2` |
-| 目标维度 | `visual_fidelity`、`text_consistency`、`physical_plausibility`、`composition_aesthetics` |
+| 目标维度 | 4 个评分维度 |
+| 类别数 | 10 类电力设备/结构 |
 
-当前类别标签包括：
+类别包括：
 
 - `wind_turbine`
 - `transformer`
@@ -264,9 +370,9 @@ flowchart LR
 - `busbar`
 - `frame`
 
-### 3.5 教师模型配置
+### 4.6 教师模型配置
 
-在 `electric-score-v3` 路线中，教师模型配置为：
+当前 `v3` 路线里，教师模型配置如下：
 
 | 维度 | 教师模型 |
 | --- | --- |
@@ -275,137 +381,168 @@ flowchart LR
 | 物理合理性 | `CLIP-IQA/physical_plausibility` |
 | 构图美学 | `Aesthetic Predictor (CLIP-L14)` |
 
-这说明当前 `v3` 路线并不是单纯重新训练一个黑盒模型，而是采用：
+这意味着评分训练时的“更改”不只是换个权重文件，而是把教师模型、检测特征和自训练 bundle 组织成了新的评分结构。
 
-- 教师模型提供监督信号
-- 检测器提供行业目标信息
-- 自训练 bundle 提供统一部署形态
+### 4.7 评分模型结构图
 
-### 3.6 评分训练数据
+```mermaid
+flowchart LR
+    Image["图像"] --> CNN["EfficientNet-B0 图像特征"]
+    Prompt["Prompt"] --> Emb["EmbeddingBag Prompt 编码"]
+    Det["YOLO 检测结果"] --> Yolo["检测特征编码"]
+    CNN --> Fuse["融合层 MLP"]
+    Emb --> Fuse
+    Yolo --> Fuse
+    Fuse --> H1["visual_fidelity"]
+    Fuse --> H2["text_consistency"]
+    Fuse --> H3["physical_plausibility"]
+    Fuse --> H4["composition_aesthetics"]
+```
 
-评分训练依赖的数据类型主要包括：
+### 4.8 评分训练流程
 
-- 生成图像样本
-- Prompt 文本
-- 电力设备检测结果
-- 四维评分目标
-- 总分权重配置
-
-当前代码中已经明确保存和使用：
-
-- 评分目标维度
-- 电力设备类别
-- 权重配置
-- detector bundle 来源
-- bundle 配置清单
-
-这意味着评分训练的数据组织核心是“图像 + Prompt + 检测特征 + 四维目标”。
-
-### 3.7 评分训练流程
+当前代码中的评分训练更准确地说，是“评分 bundle 构造与运行时导出流程”。它已经实现的内容如下：
 
 ```mermaid
 flowchart TD
-    A["评分数据 / Prompt / 检测器"] --> B["ScoringTrainingConfig"]
-    B --> C["生成 bundle_config.json"]
-    C --> D["生成 bundle_manifest.json"]
-    D --> E["生成 metrics.json"]
-    E --> F["复制 yolo_aux.pt"]
-    F --> G["导出 electric-score-v3 bundle"]
-    G --> H["PowerScoreRuntime 加载"]
+    A["ScoringTrainingConfig"] --> B["生成 bundle_config.json"]
+    B --> C["生成 bundle_manifest.json"]
+    C --> D["生成 metrics.json"]
+    D --> E["复制 yolo_aux.pt"]
+    E --> F["导出 electric-score-v3 bundle"]
+    F --> G["PowerScoreRuntime 加载与推理"]
 ```
 
-### 3.8 评分训练命令
+### 4.9 评分模型训练前后对比
+
+| 对比项 | `electric-score-v1` | `electric-score-v2 / v3` |
+| --- | --- | --- |
+| 评分形式 | 默认组合评分链路 | 自训练 bundle / hybrid 路线 |
+| 行业特征 | 相对较弱 | 更强调电力设备类别与结构约束 |
+| 检测辅助 | 无明显独立 detector bundle 组织 | 支持 `yolo_aux.pt` |
+| 部署方式 | 直接依赖多个评分组件 | 以 bundle 为中心组织 |
+| 演进空间 | 适合默认上线 | 更适合论文和专用模型叙事 |
+
+### 4.10 评分模型趋势图
+
+同样，下面图表用于展示“训练和升级后的预期趋势”，是论文表达模板，不是当前仓库自动记录的真实数值。
+
+```mermaid
+xychart-beta
+    title "评分模型升级：行业约束能力变化示意（非实测）"
+    x-axis ["electric-score-v1","electric-score-v2","electric-score-v3"]
+    y-axis "相对水平" 0 --> 100
+    bar [48,71,87]
+```
+
+```mermaid
+xychart-beta
+    title "评分模型训练阶段：多维一致性提升示意（非实测）"
+    x-axis ["初始","阶段1","阶段2","阶段3","bundle导出"]
+    y-axis "相对水平" 0 --> 100
+    line [44,56,68,79,83]
+```
+
+### 4.11 评分训练命令
 
 ```powershell
 & 'G:\miniconda3\envs\electric-ai-py310\python.exe' python-ai-service/scripts/train_scoring_v3.py
 ```
 
-执行后会输出：
+当前命令执行后，主要输出：
 
 - `scoring_training_root`
 - `scoring_model_root`
+- `bundle_config.json`
+- `bundle_manifest.json`
+- `metrics.json`
 
-最终评分模型目录应位于：
+最终输出目录在：
 
 - `G:\electric-ai-runtime\models\scoring\electric-score-v3`
 
-## 4. 模型使用方法
+### 4.12 评分训练中“已实现”和“待扩展”部分
 
-### 4.1 生成模型使用
+为了保证文档真实，下面明确区分：
 
-在平台中使用生成模型的方式有两类：
+#### 当前代码已实现
 
-1. 前端工作台中直接选择模型
-2. 通过 smoke test 或接口调用指定模型名
+- 评分模型 bundle 配置输出
+- `YOLO` 辅助 detector bundle 复用
+- `electric-score-v2 / v3` 运行时加载入口
+- hybrid 运行时结构
+- 多维权重与等级带配置
 
-常用模型名：
+#### 当前代码仍可继续扩展
+
+- 更完整的监督训练数据制作
+- 大规模评分样本构建
+- 真实训练日志持久化与可视化
+- 更完整的量化评估结果导出
+
+## 5. 模型使用方法
+
+### 5.1 生成模型使用
+
+在前端工作台或任务接口中，可以选择以下生成模型：
 
 - `sd15-electric`
 - `sd15-electric-specialized`
 - `unipic2-kontext`
 
-### 4.2 评分模型使用
+推荐策略：
 
-常用评分模型名：
+- 日常联调优先：`sd15-electric`
+- 最终展示图优先：`unipic2-kontext`
+- 行业专用实验优先：`sd15-electric-specialized`
+
+### 5.2 评分模型使用
+
+当前可用评分模型名包括：
 
 - `electric-score-v1`
 - `electric-score-v2`
 - `electric-score-v3`
 
-默认情况下，生成任务提交后会自动触发评分流程。
+推荐策略：
 
-### 4.3 Windows 原生使用建议
+- 平台默认流程：`electric-score-v1`
+- 展示模型演进路线：`electric-score-v2` / `electric-score-v3`
 
-- 日常联调优先：`sd15-electric + electric-score-v1`
-- 展示图优先：`unipic2-kontext + electric-score-v1`
-- 行业专用实验优先：`sd15-electric-specialized + electric-score-v3`
+### 5.3 Windows 原生训练建议
 
-### 4.4 Docker GPU 使用建议
+- 训练、调试和日志查看优先在 Windows 原生环境中完成
+- 模型目录统一落在 `G:\electric-ai-runtime`
+- 用 smoke test 验证训练后模型是否真能接入平台
 
-Docker GPU 路线更适合：
+### 5.4 Docker GPU 使用建议
 
-- 容器化部署展示
-- 统一启动多服务
-- 更稳定地进行高质量模型演示
+Docker GPU 更适合：
 
-## 5. 训练与使用中的关键图表
+- 完整平台展示
+- 容器化编排演示
+- 稳定复现统一环境
 
-### 5.1 模型体系图
+## 6. 训练结果展示建议
 
-```mermaid
-flowchart TD
-    A["数据准备"] --> B["生成模型训练"]
-    A --> C["评分模型训练"]
-    B --> D["sd15-electric-specialized"]
-    C --> E["electric-score-v3"]
-    D --> F["Generation Runtime"]
-    E --> G["Scoring Runtime"]
-    F --> H["生成图片"]
-    H --> G
-    G --> I["四维评分 + 总分"]
-```
+如果你要把这份文档继续用于论文或答辩展示，建议后续补充以下真实内容：
 
-### 5.2 训练数据流图
+- TensorBoard 截图
+- 不同步数下的验证出图
+- `sd15-electric` 与 `sd15-electric-specialized` 的对比图
+- `electric-score-v1 / v2 / v3` 的样例评分结果对比
+- 真实 loss 曲线和验证指标曲线
 
-```mermaid
-flowchart LR
-    Public["公开数据集"] --> Merge["数据汇总"]
-    Local["本地旧项目图片"] --> Merge
-    External["外部补充图片"] --> Merge
-    Merge --> Clean["过滤 / 去重 / caption"]
-    Clean --> Curated["curated dataset"]
-    Curated --> Train["训练"]
-    Train --> Deploy["运行时部署目录"]
-```
+当前文档中的图表已经给出了展示结构，你后续可以直接把“示意图”换成真实实验图。
 
-## 6. 总结
+## 7. 总结
 
-当前项目中的模型训练与使用体系可以概括为：
+当前项目的模型训练与使用体系可以概括为：
 
-- 生成侧以 `SD1.5 + LoRA` 为核心路线
-- 评分侧以 `默认组合评分 + 自训练 bundle` 为核心路线
-- 数据准备强调电力行业图像的清洗、去重与描述补全
-- 训练输出最终都需要落到 `G:\electric-ai-runtime` 下的标准模型目录
-- 平台使用时可以根据“联调 / 展示 / 行业专用实验”选择不同模型组合
+- 生成侧采用 `SD1.5 + LoRA + 权重合并` 的电力专用化路线
+- 评分侧采用 `默认组合评分 + 自训练 bundle + hybrid 结构` 的演进路线
+- 数据准备强调扫描、过滤、去重和自动 caption 补充
+- 模型训练和部署目录统一收敛到 `G:\electric-ai-runtime`
+- 文档中重点强调了训练前后结构变化、版本对比、数据流和趋势图表达
 
-这套设计既适合毕业设计的工程说明，也适合后续继续补充真实训练结果和对比实验。
+这份文档现在更适合作为毕业设计中的“模型训练与使用说明”章节，也可以直接作为论文附录或答辩讲解材料的基础版本。

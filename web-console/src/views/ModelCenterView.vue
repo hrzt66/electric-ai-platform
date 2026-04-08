@@ -43,7 +43,7 @@ onMounted(() => {
     <el-skeleton v-if="modelPageLoading" class="page-skeleton" animated :rows="10" />
 
     <template v-else>
-      <section class="hero">
+      <section class="hero mobile-compact-card">
         <div>
           <p class="hero-eyebrow">模型目录</p>
           <h2 class="hero-title">模型中心</h2>
@@ -57,7 +57,7 @@ onMounted(() => {
           <span>{{ generationModels.length }} 个</span>
         </div>
         <div class="model-grid">
-          <article v-for="model in generationModels" :key="model.id" class="model-card">
+          <article v-for="model in generationModels" :key="model.id" class="model-card mobile-compact-card">
             <div class="card-top">
               <div>
                 <p class="model-type">{{ model.model_type }}</p>
@@ -93,7 +93,7 @@ onMounted(() => {
           <span>{{ scoringModels.length }} 个</span>
         </div>
         <div class="model-grid">
-          <article v-for="model in scoringModels" :key="model.id" class="model-card">
+          <article v-for="model in scoringModels" :key="model.id" class="model-card mobile-compact-card">
             <div class="card-top">
               <div>
                 <p class="model-type">{{ model.model_type }}</p>
@@ -246,6 +246,19 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .mobile-compact-card {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
+  .model-page,
+  .model-section,
+  .model-grid,
+  .meta {
+    gap: 10px;
+  }
+
   .hero,
   .section-header,
   .card-top {
@@ -254,7 +267,7 @@ onMounted(() => {
   }
 
   .model-card {
-    padding: 18px;
+    padding: 12px;
   }
 }
 </style>

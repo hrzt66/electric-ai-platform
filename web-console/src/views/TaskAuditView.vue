@@ -105,7 +105,7 @@ watch(
     />
 
     <template v-else>
-      <section class="summary-card">
+      <section class="summary-card mobile-compact-card">
         <div>
           <p class="summary-eyebrow">任务审计</p>
           <h2 class="summary-title">任务 #{{ taskId || '--' }}</h2>
@@ -114,14 +114,14 @@ watch(
       </section>
 
       <section class="content-grid">
-        <div class="panel">
+        <div class="panel mobile-compact-card">
           <div class="panel-header">
             <h3>时间线</h3>
           </div>
           <AuditTimeline :events="platformStore.currentTaskAudit" empty-description="当前没有可展示的审计事件。" />
         </div>
 
-        <div class="panel">
+        <div class="panel mobile-compact-card">
           <div class="panel-header">
             <h3>关联资产</h3>
           </div>
@@ -221,13 +221,25 @@ watch(
 }
 
 @media (max-width: 768px) {
+  .mobile-compact-card {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
+  .audit-page,
+  .content-grid,
+  .asset-list {
+    gap: 10px;
+  }
+
   .summary-card {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .panel {
-    padding: 18px;
+    padding: 12px;
   }
 }
 </style>

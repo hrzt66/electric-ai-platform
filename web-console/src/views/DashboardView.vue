@@ -70,7 +70,7 @@ onMounted(() => {
       </section>
 
       <section class="summary-grid">
-        <article v-for="card in summaryCards" :key="card.label" class="summary-card">
+        <article v-for="card in summaryCards" :key="card.label" class="summary-card mobile-compact-card">
           <span>{{ card.label }}</span>
           <strong>{{ card.value }}</strong>
           <small>{{ card.hint }}</small>
@@ -78,7 +78,7 @@ onMounted(() => {
       </section>
 
       <section class="list-grid">
-        <div class="panel">
+        <div class="panel mobile-compact-card">
           <div class="panel-header">
             <h3>最近任务</h3>
             <router-link to="/tasks/audit">查看审计</router-link>
@@ -97,7 +97,7 @@ onMounted(() => {
           <el-empty v-else description="当前还没有任务记录，先去生成工作台提交一条任务。" />
         </div>
 
-        <div class="panel">
+        <div class="panel mobile-compact-card">
           <div class="panel-header">
             <h3>可用模型</h3>
             <router-link to="/models">进入模型中心</router-link>
@@ -276,6 +276,20 @@ onMounted(() => {
 @media (max-width: 768px) {
   .hero {
     align-items: stretch;
+  }
+
+  .mobile-compact-card {
+    padding: 12px;
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
+  .dashboard,
+  .summary-grid,
+  .list-grid,
+  .task-list,
+  .model-list {
+    gap: 10px;
   }
 
   .hero-actions,

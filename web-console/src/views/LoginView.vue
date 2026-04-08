@@ -133,7 +133,7 @@ async function submit() {
           登录后将直接进入当前平台的生成工作台。默认演示账户已预填，便于你快速联调前后端链路。
         </p>
 
-        <div class="account-hint">
+        <div class="account-hint mobile-login-summary">
           <span>默认账号：admin</span>
           <span>默认密码：admin123456</span>
         </div>
@@ -574,12 +574,30 @@ async function submit() {
     padding: 24px 16px 8px;
   }
 
+  .lead,
+  .stage-badges {
+    display: none;
+  }
+
   .stage-copy {
     gap: 14px;
   }
 
   .status-grid {
     grid-template-columns: 1fr;
+  }
+
+  .status-card,
+  .system-board,
+  .login-shell-inner {
+    border-radius: var(--ea-mobile-card-radius);
+    box-shadow: var(--ea-mobile-card-shadow);
+  }
+
+  .status-card,
+  .board-row,
+  .account-hint span {
+    padding-block: 8px;
   }
 
   .system-board,
@@ -589,6 +607,10 @@ async function submit() {
 
   .shell-header {
     flex-direction: column;
+  }
+
+  .shell-header h2 {
+    font-size: 1.5rem;
   }
 }
 </style>

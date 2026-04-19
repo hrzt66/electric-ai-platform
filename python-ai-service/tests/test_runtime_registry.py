@@ -5,7 +5,7 @@ def test_runtime_registry_marks_sd15_available_when_local_files_exist(tmp_path):
     from app.core.settings import Settings
     from app.runtimes.runtime_registry import RuntimeRegistry
 
-    generation_dir = tmp_path / "models" / "generation" / "sd15-electric"
+    generation_dir = tmp_path / "generation" / "sd15-electric"
     generation_dir.mkdir(parents=True)
     (generation_dir / "model_index.json").write_text("{}", encoding="utf-8")
 
@@ -23,7 +23,7 @@ def test_runtime_registry_marks_unipic2_available_when_local_files_exist(tmp_pat
     from app.core.settings import Settings
     from app.runtimes.runtime_registry import RuntimeRegistry
 
-    generation_dir = tmp_path / "models" / "generation" / "unipic2-kontext"
+    generation_dir = tmp_path / "generation" / "unipic2-kontext"
     generation_dir.mkdir(parents=True)
     (generation_dir / "model_index.json").write_text("{}", encoding="utf-8")
 
@@ -37,6 +37,24 @@ def test_runtime_registry_marks_unipic2_available_when_local_files_exist(tmp_pat
     assert Path(unipic2["local_dir"]) == generation_dir
 
 
+def test_runtime_registry_marks_ssd1b_available_when_local_files_exist(tmp_path):
+    from app.core.settings import Settings
+    from app.runtimes.runtime_registry import RuntimeRegistry
+
+    generation_dir = tmp_path / "generation" / "ssd1b-electric"
+    generation_dir.mkdir(parents=True)
+    (generation_dir / "model_index.json").write_text("{}", encoding="utf-8")
+
+    settings = Settings(runtime_root=tmp_path)
+    registry = RuntimeRegistry(settings=settings)
+
+    models = registry.list_models()
+    ssd1b = next(item for item in models["items"] if item["name"] == "ssd1b-electric")
+
+    assert ssd1b["status"] == "available"
+    assert Path(ssd1b["local_dir"]) == generation_dir
+
+
 def test_runtime_registry_builds_sd15_runtime_from_settings(tmp_path):
     from app.core.settings import Settings
     from app.runtimes.runtime_registry import RuntimeRegistry
@@ -48,7 +66,21 @@ def test_runtime_registry_builds_sd15_runtime_from_settings(tmp_path):
     runtime = registry.get_generation_runtime("sd15-electric")
 
     assert isinstance(runtime, SD15Runtime)
-    assert runtime.model_dir == tmp_path / "models" / "generation" / "sd15-electric"
+    assert runtime.model_dir == tmp_path / "generation" / "sd15-electric"
+
+
+def test_runtime_registry_builds_ssd1b_runtime_from_settings(tmp_path):
+    from app.core.settings import Settings
+    from app.runtimes.runtime_registry import RuntimeRegistry
+    from app.runtimes.ssd1b_runtime import SSD1BRuntime
+
+    settings = Settings(runtime_root=tmp_path)
+    registry = RuntimeRegistry(settings=settings)
+
+    runtime = registry.get_generation_runtime("ssd1b-electric")
+
+    assert isinstance(runtime, SSD1BRuntime)
+    assert runtime.model_dir == tmp_path / "generation" / "ssd1b-electric"
 
 
 def test_runtime_registry_builds_specialized_sd15_runtime_from_settings(tmp_path):
@@ -62,7 +94,7 @@ def test_runtime_registry_builds_specialized_sd15_runtime_from_settings(tmp_path
     runtime = registry.get_generation_runtime("sd15-electric-specialized")
 
     assert isinstance(runtime, SD15Runtime)
-    assert runtime.model_dir == tmp_path / "models" / "generation" / "sd15-electric-specialized"
+    assert runtime.model_dir == tmp_path / "generation" / "sd15-electric-specialized"
 
 
 def test_runtime_registry_builds_unipic2_runtime_from_settings(tmp_path):
@@ -76,7 +108,7 @@ def test_runtime_registry_builds_unipic2_runtime_from_settings(tmp_path):
     runtime = registry.get_generation_runtime("unipic2-kontext")
 
     assert isinstance(runtime, UniPic2Runtime)
-    assert runtime.model_dir == tmp_path / "models" / "generation" / "unipic2-kontext"
+    assert runtime.model_dir == tmp_path / "generation" / "unipic2-kontext"
 
 
 def test_runtime_registry_switches_generation_runtime_as_single_active(tmp_path):
@@ -97,18 +129,18 @@ def test_runtime_registry_switches_generation_runtime_as_single_active(tmp_path)
 
     registry._generation_runtime_factories = {
         "sd15-electric": lambda: runtimes.setdefault("sd15-electric", FakeRuntime("sd15-electric")),
-        "unipic2-kontext": lambda: runtimes.setdefault("unipic2-kontext", FakeRuntime("unipic2-kontext")),
+        "ssd1b-electric": lambda: runtimes.setdefault("ssd1b-electric", FakeRuntime("ssd1b-electric")),
     }
 
     sd15_runtime = registry.get_generation_runtime("sd15-electric")
     assert registry.get_generation_runtime("sd15-electric") is sd15_runtime
     assert sd15_runtime.unloaded is False
 
-    unipic2_runtime = registry.get_generation_runtime("unipic2-kontext")
+    ssd1b_runtime = registry.get_generation_runtime("ssd1b-electric")
 
-    assert unipic2_runtime is runtimes["unipic2-kontext"]
+    assert ssd1b_runtime is runtimes["ssd1b-electric"]
     assert sd15_runtime.unloaded is True
-    assert registry._runtime_cache == {"unipic2-kontext": unipic2_runtime}
+    assert registry._runtime_cache == {"ssd1b-electric": ssd1b_runtime}
 
 
 def test_runtime_registry_releases_requested_generation_runtime(tmp_path):
@@ -154,24 +186,24 @@ def test_runtime_registry_logs_runtime_switch_and_release(tmp_path, caplog):
     runtimes: dict[str, FakeRuntime] = {}
     registry._generation_runtime_factories = {
         "sd15-electric": lambda: runtimes.setdefault("sd15-electric", FakeRuntime("sd15-electric")),
-        "unipic2-kontext": lambda: runtimes.setdefault("unipic2-kontext", FakeRuntime("unipic2-kontext")),
+        "ssd1b-electric": lambda: runtimes.setdefault("ssd1b-electric", FakeRuntime("ssd1b-electric")),
     }
 
     registry.get_generation_runtime("sd15-electric")
-    registry.get_generation_runtime("unipic2-kontext")
+    registry.get_generation_runtime("ssd1b-electric")
     registry.release_generation_runtime()
 
     messages = "\n".join(record.getMessage() for record in caplog.records)
     assert "building generation runtime model=sd15-electric" in messages
-    assert "switching generation runtime from=sd15-electric to=unipic2-kontext" in messages
-    assert "releasing generation runtime model=unipic2-kontext" in messages
+    assert "switching generation runtime from=sd15-electric to=ssd1b-electric" in messages
+    assert "releasing generation runtime model=ssd1b-electric" in messages
 
 
 def test_runtime_registry_lists_specialized_sd15_model(tmp_path):
     from app.core.settings import Settings
     from app.runtimes.runtime_registry import RuntimeRegistry
 
-    generation_dir = tmp_path / "models" / "generation" / "sd15-electric-specialized"
+    generation_dir = tmp_path / "generation" / "sd15-electric-specialized"
     generation_dir.mkdir(parents=True)
     (generation_dir / "model_index.json").write_text("{}", encoding="utf-8")
 

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 
@@ -12,9 +14,10 @@ class FakeRuntime:
 class FakeRuntimeRegistry:
     def __init__(self) -> None:
         self.runtime = FakeRuntime()
+        self.runtime_root = Path("/tmp/electric-ai-platform/model")
 
     def build_status(self) -> dict:
-        return {"runtime_root": r"G:\electric-ai-runtime", "directories": {}, "models": []}
+        return {"runtime_root": str(self.runtime_root), "directories": {}, "models": []}
 
     def list_models(self) -> dict:
         return {
@@ -34,7 +37,7 @@ class FakeRuntimeRegistry:
 
 class FakeGenerationService:
     def generate(self, job, runtime):
-        return [{"file_path": rf"G:\electric-ai-runtime\outputs\images\{job.job_id}_0_{job.seed}.png", "seed": job.seed}]
+        return [{"file_path": str(Path("/tmp/electric-ai-platform/model/image") / f"{job.job_id}_0_{job.seed}.png"), "seed": job.seed}]
 
 
 class FakeScoringService:
@@ -101,7 +104,7 @@ def test_runtime_endpoints_delegate_to_runtime_registry():
     models_response = client.get("/runtime/models")
 
     assert status_response.status_code == 200
-    assert status_response.json()["runtime_root"] == r"G:\electric-ai-runtime"
+    assert status_response.json()["runtime_root"] == "/tmp/electric-ai-platform/model"
     assert models_response.status_code == 200
     assert models_response.json()["items"][0]["status"] == "available"
 

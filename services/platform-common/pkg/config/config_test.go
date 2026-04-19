@@ -93,6 +93,45 @@ func TestLoadPrefersExplicitEnvOverDotEnvLocal(t *testing.T) {
 	}
 }
 
+func TestLoadPrefersNearestDotEnvLocalOverParent(t *testing.T) {
+	parentDir := t.TempDir()
+	childDir := filepath.Join(parentDir, "services", "asset-service")
+	if err := os.MkdirAll(childDir, 0o755); err != nil {
+		t.Fatalf("mkdir child: %v", err)
+	}
+
+	parentEnv := "JWT_SECRET=parent-secret\nMYSQL_DSN=root:root@tcp(127.0.0.1:3307)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local\nREDIS_ADDR=127.0.0.1:6380\n"
+	childEnv := "APP_NAME=asset-service\nHTTP_PORT=8084\nJWT_SECRET=child-secret\n"
+	if err := os.WriteFile(filepath.Join(parentDir, ".env.local"), []byte(parentEnv), 0o644); err != nil {
+		t.Fatalf("write parent env: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(childDir, ".env.local"), []byte(childEnv), 0o644); err != nil {
+		t.Fatalf("write child env: %v", err)
+	}
+
+	restoreCwd := chdirTemp(t, childDir)
+	defer restoreCwd()
+	unsetConfigEnv(t)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if cfg.AppName != "asset-service" {
+		t.Fatalf("expected child app name, got %s", cfg.AppName)
+	}
+	if cfg.HTTPPort != "8084" {
+		t.Fatalf("expected child http port, got %s", cfg.HTTPPort)
+	}
+	if cfg.JWTSecret != "child-secret" {
+		t.Fatalf("expected child jwt secret, got %s", cfg.JWTSecret)
+	}
+	if cfg.RedisAddr != "127.0.0.1:6380" {
+		t.Fatalf("expected parent redis addr, got %s", cfg.RedisAddr)
+	}
+}
+
 func chdirTemp(t *testing.T, dir string) func() {
 	t.Helper()
 	cwd, err := os.Getwd()

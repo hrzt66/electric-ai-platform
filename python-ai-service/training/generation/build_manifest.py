@@ -7,8 +7,14 @@ from training.generation.dedupe import dedupe_rows_by_fingerprint
 from training.generation.scan_sources import scan_image_roots
 
 
-def build_generation_manifest(*, public_roots: list[Path], local_roots: list[Path], external_roots: list[Path]) -> list[dict]:
-    rows: list[dict] = []
+def build_generation_manifest(
+    *,
+    public_roots: list[Path],
+    local_roots: list[Path],
+    external_roots: list[Path],
+    precomputed_rows: list[dict] | None = None,
+) -> list[dict]:
+    rows: list[dict] = list(precomputed_rows or [])
     rows.extend(scan_image_roots("public", public_roots))
     rows.extend(scan_image_roots("local", local_roots))
     rows.extend(scan_image_roots("external", external_roots))

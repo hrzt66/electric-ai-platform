@@ -6,7 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 import gc
 
-from app.core.torch_cuda import best_effort_cleanup_cuda
+from app.core.torch_cuda import best_effort_cleanup_torch, preferred_torch_device_type
 from app.runtimes.base import GeneratedImageRecord
 
 
@@ -29,19 +29,23 @@ class SD15Runtime:
         from diffusers import StableDiffusionPipeline
         import torch
 
+        device_type = preferred_torch_device_type()
+        dtype = torch.float16 if device_type == "cuda" else torch.float32
         pipe = StableDiffusionPipeline.from_pretrained(
             self.model_dir,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            torch_dtype=dtype,
             safety_checker=None,
             local_files_only=True,
         )
         pipe.enable_attention_slicing()
         pipe.enable_vae_slicing()
-        if torch.cuda.is_available():
+        if device_type == "cuda":
             if hasattr(pipe, "enable_model_cpu_offload"):
                 pipe.enable_model_cpu_offload()
             else:
                 pipe = pipe.to("cuda")
+        elif device_type == "mps":
+            pipe = pipe.to("mps")
         else:
             pipe = pipe.to("cpu")
         return pipe
@@ -105,7 +109,7 @@ class SD15Runtime:
         except ImportError:
             return None
 
-        generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu")
+        generator = torch.Generator(device=preferred_torch_device_type())
         generator.manual_seed(seed)
         return generator
 
@@ -115,4 +119,4 @@ class SD15Runtime:
             del self._pipeline
             self._pipeline = None
         gc.collect()
-        best_effort_cleanup_cuda(label="sd15-unload")
+        best_effort_cleanup_torch(label="sd15-unload")

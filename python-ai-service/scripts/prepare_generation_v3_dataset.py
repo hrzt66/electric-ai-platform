@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -20,6 +21,12 @@ def _existing(paths: list[Path]) -> list[Path]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Prepare the generation-v3 dataset, optionally downloading public electric images.")
+    parser.add_argument("--skip-public-downloads", action="store_true", help="Skip downloading public images from official providers.")
+    parser.add_argument("--openverse-limit", type=int, default=None, help="Override the default Openverse download limit.")
+    parser.add_argument("--wikimedia-limit", type=int, default=None, help="Override the default Wikimedia download limit.")
+    args = parser.parse_args()
+
     settings = get_settings()
     runtime_root = Path(settings.runtime_root)
     legacy_static = get_legacy_project_root() / "static"
@@ -29,6 +36,16 @@ def main() -> int:
         public_roots=_existing([runtime_root / "datasets" / "external"]),
         local_roots=_existing([legacy_static]),
         external_roots=[],
+        include_public_downloads=not args.skip_public_downloads,
+        provider_limits={
+            key: value
+            for key, value in {
+                "openverse": args.openverse_limit,
+                "wikimedia": args.wikimedia_limit,
+            }.items()
+            if value is not None
+        }
+        or None,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0

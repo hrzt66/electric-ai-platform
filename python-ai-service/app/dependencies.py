@@ -39,8 +39,10 @@ def build_scoring_service(
         shared_clip_runtime=ClipIQARuntime(mode="visual_fidelity"),
         bundle_runtime=PowerScoreRouter(
             {
-                "electric-score-v2": PowerScoreRuntime(runtime_settings.scoring_model_dir / "electric-score-v2"),
-                "electric-score-v3": PowerScoreRuntime(runtime_settings.scoring_model_dir / "electric-score-v3"),
+                "electric-score-v2": PowerScoreRuntime(
+                    runtime_settings.scoring_model_dir / "electric-score-v2",
+                    image_check_dir=runtime_settings.output_image_check_dir,
+                ),
             }
         ),
         release_after_batch=(

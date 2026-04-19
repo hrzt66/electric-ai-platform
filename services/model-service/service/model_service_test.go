@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -70,5 +72,55 @@ func TestGetModelReturnsNamedRecord(t *testing.T) {
 	}
 	if item.Status != "experimental" {
 		t.Fatalf("expected experimental status, got %+v", item)
+	}
+}
+
+func TestHydrateStatusMarksLegacyElectricScoreAvailableWhenDependenciesExist(t *testing.T) {
+	root := t.TempDir()
+	imageRewardDir := filepath.Join(root, "image-reward")
+	aestheticDir := filepath.Join(root, "aesthetic-predictor")
+
+	if err := os.MkdirAll(imageRewardDir, 0o755); err != nil {
+		t.Fatalf("mkdir image-reward: %v", err)
+	}
+	if err := os.MkdirAll(aestheticDir, 0o755); err != nil {
+		t.Fatalf("mkdir aesthetic-predictor: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(imageRewardDir, "config.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write image-reward marker: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(aestheticDir, "sac+logos+ava1-l14-linearMSE.pth"), []byte("stub"), 0o644); err != nil {
+		t.Fatalf("write aesthetic marker: %v", err)
+	}
+
+	item := hydrateStatus(RegistryModel{
+		ModelName: "electric-score-v1",
+		Status:    "available",
+		LocalPath: filepath.Join(root, "electric-score-v1"),
+	})
+
+	if item.Status != "available" {
+		t.Fatalf("expected legacy electric-score-v1 to be available, got %+v", item)
+	}
+}
+
+func TestHydrateStatusMarksLegacyElectricScoreUnavailableWhenDependenciesMissing(t *testing.T) {
+	root := t.TempDir()
+	imageRewardDir := filepath.Join(root, "image-reward")
+	if err := os.MkdirAll(imageRewardDir, 0o755); err != nil {
+		t.Fatalf("mkdir image-reward: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(imageRewardDir, "config.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write image-reward marker: %v", err)
+	}
+
+	item := hydrateStatus(RegistryModel{
+		ModelName: "electric-score-v1",
+		Status:    "available",
+		LocalPath: filepath.Join(root, "electric-score-v1"),
+	})
+
+	if item.Status != "unavailable" {
+		t.Fatalf("expected legacy electric-score-v1 to become unavailable, got %+v", item)
 	}
 }

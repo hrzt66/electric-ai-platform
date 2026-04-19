@@ -60,4 +60,10 @@ func TestModelInitScriptsKeepRegistrySeedIdempotent(t *testing.T) {
 	if !strings.Contains(seed, "electric-score-v2") {
 		t.Fatal("expected seed script to register the self-trained scoring model")
 	}
+	if !strings.Contains(seed, "ssd1b-electric") {
+		t.Fatal("expected seed script to register the SSD-1B generation model")
+	}
+	if !strings.Contains(seed, "unipic2-kontext") {
+		t.Fatal("expected seed script to keep the UniPic2 generation model")
+	}
 }

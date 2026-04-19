@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"electric-ai/services/model-service/model"
 )
@@ -50,8 +51,20 @@ func hydrateStatus(item RegistryModel) RegistryModel {
 		return item
 	}
 
-	entries, err := os.ReadDir(item.LocalPath)
-	if err != nil || len(entries) == 0 {
+	if item.ModelName == "electric-score-v1" {
+		imageRewardDir := filepath.Join(filepath.Dir(item.LocalPath), "image-reward")
+		aestheticDir := filepath.Join(filepath.Dir(item.LocalPath), "aesthetic-predictor")
+		if hasLocalModelFiles(imageRewardDir) && hasLocalModelFiles(aestheticDir) {
+			item.Status = "available"
+			return item
+		}
+		if item.Status != "experimental" {
+			item.Status = "unavailable"
+		}
+		return item
+	}
+
+	if !hasLocalModelFiles(item.LocalPath) {
 		if item.Status != "experimental" {
 			item.Status = "unavailable"
 		}
@@ -60,4 +73,9 @@ func hydrateStatus(item RegistryModel) RegistryModel {
 
 	item.Status = "available"
 	return item
+}
+
+func hasLocalModelFiles(path string) bool {
+	entries, err := os.ReadDir(path)
+	return err == nil && len(entries) > 0
 }

@@ -41,6 +41,40 @@ export type ScoreSummary = {
   total_score: number
 }
 
+export type ScoreDimensionKey =
+  | 'visual_fidelity'
+  | 'text_consistency'
+  | 'physical_plausibility'
+  | 'composition_aesthetics'
+  | 'total_score'
+
+export type ScoreExplanationDetection = {
+  class_name: string
+  confidence: number
+  bbox?: number[]
+}
+
+export type ScoreExplanationDimension = {
+  title?: string
+  score?: number
+  grade_label?: string
+  uses_yolo: boolean
+  summary: string
+  formula: string
+  details: string[]
+  checked_image_path?: string
+  expected_classes?: string[]
+  matched_classes?: string[]
+  missing_classes?: string[]
+  detections?: ScoreExplanationDetection[]
+  inputs?: Record<string, unknown>
+}
+
+export type ScoreExplanation = {
+  checked_image_path?: string
+  dimensions: Partial<Record<ScoreDimensionKey, ScoreExplanationDimension>>
+}
+
 export type AssetHistoryItem = ScoreSummary & {
   id: number
   job_id: number
@@ -54,6 +88,23 @@ export type AssetHistoryItem = ScoreSummary & {
   seed: number
   guidance_scale: number
   created_at: string
+}
+
+export type AssetHistoryPageQuery = {
+  page: number
+  page_size: number
+  prompt_keyword?: string
+  model_name?: string
+  status?: string
+  min_total_score?: number
+}
+
+export type AssetHistoryPage = {
+  items: AssetHistoryItem[]
+  page: number
+  page_size: number
+  total: number
+  total_pages: number
 }
 
 export type AssetDetail = {
@@ -75,6 +126,8 @@ export type AssetDetail = {
     guidance_scale: number
   }
   score: ScoreSummary
+  checked_image_path?: string
+  score_explanation?: ScoreExplanation
 }
 
 export type AuditEvent = {

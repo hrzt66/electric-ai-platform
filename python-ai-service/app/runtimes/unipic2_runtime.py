@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from app.core.runtime_logging import configure_runtime_logging
-from app.core.torch_cuda import best_effort_cleanup_cuda, seed_global_torch
+from app.core.torch_cuda import best_effort_cleanup_torch, preferred_torch_device_type, seed_global_torch
 from app.runtimes.base import GeneratedImageRecord
 
 configure_runtime_logging()
@@ -34,12 +34,14 @@ class UniPic2Runtime:
             self.offload_mode,
         )
 
-    def _model_load_kwargs(self, *, dtype, cuda_available: bool) -> dict:
+    def _model_load_kwargs(self, *, dtype, device_type: str | None = None, cuda_available: bool | None = None) -> dict:
+        if device_type is None:
+            device_type = "cuda" if cuda_available else "cpu"
         kwargs = {
             "torch_dtype": dtype,
             "local_files_only": True,
         }
-        if cuda_available:
+        if device_type == "cuda":
             kwargs["low_cpu_mem_usage"] = True
         return kwargs
 
@@ -57,9 +59,9 @@ class UniPic2Runtime:
         from unipicv2.pipeline_stable_diffusion_3_kontext import StableDiffusion3KontextPipeline
         from unipicv2.transformer_sd3_kontext import SD3Transformer2DKontextModel
 
-        cuda_available = bool(torch.cuda.is_available())
-        dtype = torch.float16 if cuda_available else torch.float32
-        model_load_kwargs = self._model_load_kwargs(dtype=dtype, cuda_available=cuda_available)
+        device_type = preferred_torch_device_type()
+        dtype = torch.float16 if device_type in {"cuda", "mps"} else torch.float32
+        model_load_kwargs = self._model_load_kwargs(dtype=dtype, device_type=device_type)
 
         transformer = SD3Transformer2DKontextModel.from_pretrained(
             self.model_dir,
@@ -127,16 +129,22 @@ class UniPic2Runtime:
         if hasattr(pipe.transformer, "enable_forward_chunking"):
             pipe.transformer.enable_forward_chunking(chunk_size=1, dim=1)
 
-        return self._apply_execution_strategy(pipe, cuda_available=cuda_available)
+        return self._apply_execution_strategy(pipe, device_type=device_type)
 
-    def _apply_execution_strategy(self, pipe, *, cuda_available: bool):
+    def _apply_execution_strategy(self, pipe, *, device_type: str | None = None, cuda_available: bool | None = None):
         """根据 offload_mode 选择 CPU/GPU 执行策略，平衡显存与速度。"""
+        if device_type is None:
+            device_type = "cuda" if cuda_available else "cpu"
         logger.info(
             "applying unipic2 execution strategy cuda=%s offload_mode=%s",
-            cuda_available,
+            device_type == "cuda",
             self.offload_mode,
         )
-        if not cuda_available:
+        if device_type == "mps":
+            logger.info("enabled unipic2 strategy=mps")
+            return pipe.to("mps")
+
+        if device_type != "cuda":
             logger.info("enabled unipic2 strategy=cpu")
             return pipe.to("cpu")
 
@@ -227,7 +235,8 @@ class UniPic2Runtime:
         except ImportError:
             return None
 
-        if torch.cuda.is_available() and self.offload_mode != "none":
+        device_type = preferred_torch_device_type()
+        if device_type == "cuda" and self.offload_mode != "none":
             seed_global_torch(seed)
             logger.info(
                 "using global torch seed for offloaded unipic2 run seed=%s offload_mode=%s",
@@ -236,14 +245,14 @@ class UniPic2Runtime:
             )
             return None
 
-        target_device = "cuda" if torch.cuda.is_available() else "cpu"
+        target_device = device_type
         try:
             generator = torch.Generator(device=target_device)
         except RuntimeError:
             if target_device != "cuda":
                 raise
             logger.warning("cuda generator creation failed once, attempting emergency cleanup before retry")
-            best_effort_cleanup_cuda(logger=logger, label="unipic2-generator-retry")
+            best_effort_cleanup_torch(logger=logger, label="unipic2-generator-retry")
             generator = torch.Generator(device=target_device)
         generator.manual_seed(seed)
         return generator
@@ -255,4 +264,4 @@ class UniPic2Runtime:
             del self._pipeline
             self._pipeline = None
         gc.collect()
-        best_effort_cleanup_cuda(logger=logger, label="unipic2-unload")
+        best_effort_cleanup_torch(logger=logger, label="unipic2-unload")

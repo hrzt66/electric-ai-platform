@@ -236,6 +236,37 @@ powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1
 - `REDIS_ADDR`
 - `JWT_SECRET`
 
+### macOS / Linux 本地依赖
+
+如果你只是想在 Docker 里准备本地开发所需的 MySQL 和 Redis，可以直接执行：
+
+```bash
+./scripts/dev-up.sh
+```
+
+停止并清理数据卷：
+
+```bash
+./scripts/dev-down.sh
+```
+
+这套脚本默认使用 `deploy/docker-compose.dependencies.yml`，会启动：
+
+- MySQL：`127.0.0.1:3307`
+- Redis：`127.0.0.1:6380`
+
+本地服务可直接复用下面这些连接参数：
+
+- `MYSQL_DSN=root:root@tcp(127.0.0.1:3307)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local`
+- `REDIS_ADDR=127.0.0.1:6380`
+- `REDIS_URL=redis://127.0.0.1:6380/0`
+
+如果你想改端口，也可以在执行前覆盖环境变量，例如：
+
+```bash
+MYSQL_PORT=13307 REDIS_PORT=16380 ./scripts/dev-up.sh
+```
+
 ## Docker 运行
 
 Docker 路线使用完整编排文件 `deploy/docker-compose.platform.yml`，不会覆盖当前 Windows 原生链路。

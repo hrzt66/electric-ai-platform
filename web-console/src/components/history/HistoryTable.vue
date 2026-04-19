@@ -4,6 +4,7 @@ import type { AssetHistoryItem } from '../../types/platform'
 
 defineProps<{
   items: AssetHistoryItem[]
+  total: number
   loading: boolean
 }>()
 
@@ -19,7 +20,7 @@ const emit = defineEmits<{
         <p class="table-eyebrow">资产结果</p>
         <h2 class="table-title">历史中心</h2>
       </div>
-      <el-tag type="info">共 {{ items.length }} 条</el-tag>
+      <el-tag type="info">共 {{ total }} 条</el-tag>
     </div>
 
     <el-table :data="items" stripe v-loading="loading" class="history-table" empty-text="暂无历史资产" @row-click="emit('open', $event)">

@@ -8,12 +8,14 @@ import GenerationProgressCard from '../components/workbench/GenerationProgressCa
 import ParameterPanel from '../components/workbench/ParameterPanel.vue'
 import ResultPreview from '../components/workbench/ResultPreview.vue'
 import ScoreRadar from '../components/workbench/ScoreRadar.vue'
+import { localizeModelRecord } from '../model-copy'
 import { usePlatformStore } from '../stores/platform'
 import type { GenerateTaskRequest, ModelRecord, ScoreSummary } from '../types/platform'
 import { FRONTEND_DEFAULT_NEGATIVE_PROMPT, FRONTEND_DEFAULT_POSITIVE_PROMPT } from './generate-defaults'
+import { GENERATION_RECOMMENDED_NEGATIVE_PROMPT, pickRecommendedGenerationPrompt } from './generate-recommendations'
 
 const FALLBACK_SCORING_MODELS: ModelRecord[] = [
-  {
+  localizeModelRecord({
     id: -1,
     model_name: 'electric-score-v1',
     display_name: 'Electric Score V1 (Legacy)',
@@ -23,20 +25,20 @@ const FALLBACK_SCORING_MODELS: ModelRecord[] = [
     description: '现有四维评分器，基于 ImageReward、CLIP-IQA 与美学评分运行时。',
     default_positive_prompt: '',
     default_negative_prompt: '',
-    local_path: 'G:/electric-ai-runtime/models/scoring/electric-score-v1',
-  },
-  {
+    local_path: 'model/scoring/electric-score-v1',
+  }),
+  localizeModelRecord({
     id: -2,
     model_name: 'electric-score-v2',
-    display_name: 'Electric Score V2 (Self-Trained)',
+    display_name: 'Electric Score V2 (Electric Domain)',
     model_type: 'scoring',
     service_name: 'python-ai-service',
     status: 'available',
-    description: '自主训练的轻量四维评分模型，针对电力场景和 6GB 显存环境优化。',
+    description: '重新训练的轻量四维评分模型，针对电力场景和 Apple GPU / 小显存环境优化。',
     default_positive_prompt: '',
     default_negative_prompt: '',
-    local_path: 'G:/electric-ai-runtime/models/scoring/electric-score-v2',
-  },
+    local_path: 'model/scoring/electric-score-v2',
+  }),
 ]
 
 const route = useRoute()
@@ -51,7 +53,7 @@ let pollTimer: number | null = null
 const form = reactive<GenerateTaskRequest>({
   prompt: FRONTEND_DEFAULT_POSITIVE_PROMPT,
   negative_prompt: FRONTEND_DEFAULT_NEGATIVE_PROMPT,
-  model_name: 'sd15-electric',
+  model_name: 'ssd1b-electric',
   scoring_model_name: 'electric-score-v1',
   seed: -1,
   steps: 20,
@@ -63,12 +65,14 @@ const form = reactive<GenerateTaskRequest>({
 
 const activeAsset = computed(() => platformStore.currentAssets[activeIndex.value] ?? null)
 const generationModels = computed(() => platformStore.models.filter((item) => item.model_type === 'generation'))
+const availableGenerationModels = computed(() => generationModels.value.filter((item) => item.status === 'available'))
 const scoringModels = computed(() => {
   const catalog = platformStore.models.filter(
     (item) => item.model_type === 'scoring' && item.model_name.startsWith('electric-score-'),
   )
   return catalog.length > 0 ? catalog : FALLBACK_SCORING_MODELS
 })
+const availableScoringModels = computed(() => scoringModels.value.filter((item) => item.status === 'available'))
 const currentModel = computed(() => platformStore.models.find((item) => item.model_name === form.model_name) ?? null)
 const activeScores = computed<ScoreSummary | null>(() => {
   if (!activeAsset.value) {
@@ -135,10 +139,25 @@ async function submit() {
 }
 
 function fillDefaults(model: ModelRecord) {
-  // 生成模型回退到前端默认提示词，其它模型优先采用注册表里配置的默认词。
+  // 点击推荐入口时，生成模型使用前端精选提示词，便于快速试图。
   if (model.model_type === 'generation') {
-    form.prompt = FRONTEND_DEFAULT_POSITIVE_PROMPT
-    form.negative_prompt = FRONTEND_DEFAULT_NEGATIVE_PROMPT
+    form.prompt = pickRecommendedGenerationPrompt()
+    form.negative_prompt = GENERATION_RECOMMENDED_NEGATIVE_PROMPT
+    return
+  }
+
+  if (model.default_positive_prompt) {
+    form.prompt = model.default_positive_prompt
+  }
+  if (model.default_negative_prompt) {
+    form.negative_prompt = model.default_negative_prompt
+  }
+}
+
+function applyInitialPrompts(model: ModelRecord) {
+  if (model.model_type === 'generation') {
+    form.prompt = model.default_positive_prompt || FRONTEND_DEFAULT_POSITIVE_PROMPT
+    form.negative_prompt = model.default_negative_prompt || FRONTEND_DEFAULT_NEGATIVE_PROMPT
     return
   }
 
@@ -152,8 +171,24 @@ function fillDefaults(model: ModelRecord) {
 
 function syncModelFromRoute() {
   const requestedModel = typeof route.query.model === 'string' ? route.query.model : ''
-  if (requestedModel && generationModels.value.some((item) => item.model_name === requestedModel)) {
+  if (requestedModel && availableGenerationModels.value.some((item) => item.model_name === requestedModel)) {
     form.model_name = requestedModel
+  }
+}
+
+function syncAvailableDefaults() {
+  if (!availableGenerationModels.value.some((item) => item.model_name === form.model_name)) {
+    const fallbackGenerationModel = availableGenerationModels.value[0] ?? generationModels.value[0] ?? null
+    if (fallbackGenerationModel) {
+      form.model_name = fallbackGenerationModel.model_name
+    }
+  }
+
+  if (!availableScoringModels.value.some((item) => item.model_name === form.scoring_model_name)) {
+    const fallbackScoringModel = availableScoringModels.value[0] ?? scoringModels.value[0] ?? null
+    if (fallbackScoringModel) {
+      form.scoring_model_name = fallbackScoringModel.model_name
+    }
   }
 }
 
@@ -191,9 +226,10 @@ async function bootstrapWorkbench() {
 
   try {
     await platformStore.fetchModels()
+    syncAvailableDefaults()
     syncModelFromRoute()
     if (currentModel.value) {
-      fillDefaults(currentModel.value)
+      applyInitialPrompts(currentModel.value)
     }
     if (platformStore.currentTaskId) {
       await startPolling(platformStore.currentTaskId)

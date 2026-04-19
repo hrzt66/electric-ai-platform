@@ -58,6 +58,29 @@ func (c *AssetController) ListHistory(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, httpx.OK(items, "asset-history"))
 }
 
+// ListHistoryPage 返回带分页信息的历史列表，供历史中心使用。
+func (c *AssetController) ListHistoryPage(ctx *gin.Context) {
+	var query model.HistoryPageQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	page, err := c.svc.ListHistoryPage(ctx.Request.Context(), query)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    1,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, httpx.OK(page, "asset-history-page"))
+}
+
 // GetAssetDetail 返回单个资产的详细信息，供历史详情抽屉展示。
 func (c *AssetController) GetAssetDetail(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)

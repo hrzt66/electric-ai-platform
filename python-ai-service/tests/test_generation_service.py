@@ -4,7 +4,7 @@ from app.schemas.jobs import GenerateJob
 class FakeRuntime:
     def __init__(self, result=None) -> None:
         self.calls: list[dict] = []
-        self.result = result or [{"file_path": "G:/electric-ai-runtime/outputs/images/test.png"}]
+        self.result = result or [{"file_path": "model/image/test.png"}]
 
     def generate(self, **kwargs):
         self.calls.append(kwargs)
@@ -26,24 +26,31 @@ def build_job(*, seed: int) -> GenerateJob:
     )
 
 
-def test_generation_service_treats_negative_seed_as_random(monkeypatch):
-    import app.services.generation_service as generation_service_module
+def test_generation_service_derives_stable_seed_from_job_id():
     from app.services.generation_service import GenerationService
-
-    monkeypatch.setattr(
-        generation_service_module,
-        "secrets",
-        type("FakeSecrets", (), {"randbelow": staticmethod(lambda upper: 20260404)})(),
-        raising=False,
-    )
 
     runtime = FakeRuntime()
     service = GenerationService()
 
     images = service.generate(build_job(seed=-1), runtime)
 
-    assert runtime.calls[0]["seed"] == 20260405
-    assert images[0]["seed"] == 20260405
+    expected_seed = (9 * 1_103_515_245 + 12_345) % 2_147_483_647
+    assert runtime.calls[0]["seed"] == expected_seed
+    assert images[0]["seed"] == expected_seed
+
+
+def test_generation_service_reuses_same_resolved_seed_for_retried_job(monkeypatch):
+    from app.services.generation_service import GenerationService
+
+    runtime = FakeRuntime()
+    service = GenerationService()
+    job = build_job(seed=-1)
+
+    first_images = service.generate(job, runtime)
+    second_images = service.generate(job, runtime)
+
+    assert runtime.calls[0]["seed"] == runtime.calls[1]["seed"]
+    assert first_images[0]["seed"] == second_images[0]["seed"]
 
 
 def test_generation_service_keeps_explicit_seed():

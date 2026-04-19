@@ -2,23 +2,24 @@
 import { computed } from 'vue'
 
 import type { ScoreSummary } from '../../types/platform'
-import { getScoreGrade } from '../../utils/score-grade'
+import { getScoreBand } from '../../utils/score-grade'
 
 const props = defineProps<{
   scores: ScoreSummary | null
 }>()
 
 const metrics = computed(() => [
-  { label: '视觉保真', value: props.scores?.visual_fidelity ?? 0, tone: '#1d4ed8', grade: getScoreGrade(props.scores?.visual_fidelity ?? 0) },
-  { label: '文本一致', value: props.scores?.text_consistency ?? 0, tone: '#15803d', grade: getScoreGrade(props.scores?.text_consistency ?? 0) },
-  { label: '物理合理', value: props.scores?.physical_plausibility ?? 0, tone: '#d97706', grade: getScoreGrade(props.scores?.physical_plausibility ?? 0) },
+  { label: '视觉保真', value: props.scores?.visual_fidelity ?? 0, tone: '#1d4ed8', band: getScoreBand(props.scores?.visual_fidelity ?? 0) },
+  { label: '文本一致', value: props.scores?.text_consistency ?? 0, tone: '#15803d', band: getScoreBand(props.scores?.text_consistency ?? 0) },
+  { label: '物理合理', value: props.scores?.physical_plausibility ?? 0, tone: '#d97706', band: getScoreBand(props.scores?.physical_plausibility ?? 0) },
   {
     label: '构图美学',
     value: props.scores?.composition_aesthetics ?? 0,
     tone: '#b91c1c',
-    grade: getScoreGrade(props.scores?.composition_aesthetics ?? 0),
+    band: getScoreBand(props.scores?.composition_aesthetics ?? 0),
   },
 ])
+const totalBand = computed(() => (props.scores ? getScoreBand(props.scores.total_score) : null))
 
 function polarPoint(index: number, value: number, radius = 84) {
   const angle = (-90 + index * 90) * (Math.PI / 180)
@@ -57,6 +58,7 @@ const metricLabels = [
       <div class="total">
         <span>总分</span>
         <strong>{{ scores?.total_score?.toFixed(2) ?? '--' }}</strong>
+        <span v-if="totalBand" class="grade-chip total-grade" :data-grade="totalBand.key">{{ totalBand.label }}</span>
       </div>
     </div>
 
@@ -91,7 +93,7 @@ const metricLabels = [
           <span>{{ metric.label }}</span>
           <div class="metric-value">
             <strong>{{ metric.value.toFixed(2) }}</strong>
-            <span class="grade-chip" :data-grade="metric.grade">{{ metric.grade }}</span>
+            <span class="grade-chip" :data-grade="metric.band.key">{{ metric.band.label }}</span>
           </div>
         </div>
         <div class="metric-bar">
@@ -154,6 +156,10 @@ const metricLabels = [
   display: block;
   font-size: 1.22rem;
   color: #17202b;
+}
+
+.total-grade {
+  margin-top: 6px;
 }
 
 .radar-wrap {
@@ -241,31 +247,31 @@ const metricLabels = [
   border: 1px solid transparent;
 }
 
-.grade-chip[data-grade='A'] {
+.grade-chip[data-grade='excellent'] {
   color: #166534;
   background: #dcfce7;
   border-color: #86efac;
 }
 
-.grade-chip[data-grade='B'] {
+.grade-chip[data-grade='good'] {
   color: #1d4ed8;
   background: #dbeafe;
   border-color: #93c5fd;
 }
 
-.grade-chip[data-grade='C'] {
+.grade-chip[data-grade='qualified'] {
   color: #854d0e;
   background: #fef3c7;
   border-color: #fcd34d;
 }
 
-.grade-chip[data-grade='D'] {
+.grade-chip[data-grade='weak'] {
   color: #b45309;
   background: #ffedd5;
   border-color: #fdba74;
 }
 
-.grade-chip[data-grade='E'] {
+.grade-chip[data-grade='poor'] {
   color: #b91c1c;
   background: #fee2e2;
   border-color: #fca5a5;

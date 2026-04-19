@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+STYLE_PREFIX = "realistic utility inspection photography"
 
 PRIMARY_PHRASES = [
     ({"transmission", "line"}, "electric power transmission line"),
@@ -48,12 +49,27 @@ def _append_matching_phrases(phrases: list[tuple[set[str], str]], tokens: set[st
             parts.append(label)
 
 
-def apply_stub_caption(row: dict) -> dict:
-    enriched = dict(row)
-    tokens = _extract_tokens(enriched)
-    caption_parts: list[str] = []
+def build_caption_from_texts(*parts: str, fallback: str = "electric industrial scene") -> str:
+    tokens = set(TOKEN_PATTERN.findall(" ".join(part for part in parts if part).lower()))
+    caption_parts: list[str] = [STYLE_PREFIX]
     _append_matching_phrases(PRIMARY_PHRASES, tokens, caption_parts)
     _append_matching_phrases(DETAIL_PHRASES, tokens, caption_parts)
     _append_matching_phrases(STYLE_PHRASES, tokens, caption_parts)
-    enriched["caption"] = ", ".join(caption_parts) if caption_parts else "electric industrial scene"
+    if len(caption_parts) == 1:
+        caption_parts.append(fallback)
+    return ", ".join(caption_parts)
+
+
+def apply_stub_caption(row: dict) -> dict:
+    enriched = dict(row)
+    if enriched.get("caption"):
+        existing = str(enriched["caption"]).strip()
+        if existing.lower().startswith(STYLE_PREFIX):
+            enriched["caption"] = existing
+        else:
+            enriched["caption"] = f"{STYLE_PREFIX}, {existing}"
+        return enriched
+
+    path = Path(enriched["path"])
+    enriched["caption"] = build_caption_from_texts(path.as_posix(), path.stem, str(enriched["filename"]))
     return enriched

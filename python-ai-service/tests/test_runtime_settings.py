@@ -8,13 +8,14 @@ from requests.exceptions import ChunkedEncodingError
 def test_settings_default_to_g_drive_runtime(monkeypatch):
     monkeypatch.delenv("ELECTRIC_AI_RUNTIME_ROOT", raising=False)
 
-    from app.core.settings import Settings
+    from app.core.settings import DEFAULT_RUNTIME_ROOT, Settings
 
     settings = Settings()
 
-    assert settings.runtime_root == Path(r"G:\electric-ai-runtime")
-    assert settings.output_image_dir == Path(r"G:\electric-ai-runtime\outputs\images")
-    assert settings.hf_home == Path(r"G:\electric-ai-runtime\hf-home")
+    assert settings.runtime_root == DEFAULT_RUNTIME_ROOT
+    assert settings.output_image_dir == DEFAULT_RUNTIME_ROOT / "image"
+    assert settings.output_image_check_dir == DEFAULT_RUNTIME_ROOT / "image_check"
+    assert settings.hf_home == DEFAULT_RUNTIME_ROOT / "hf-home"
 
 
 def test_runtime_paths_probe_report_marks_missing_directories(tmp_path):
@@ -26,6 +27,7 @@ def test_runtime_paths_probe_report_marks_missing_directories(tmp_path):
     assert report["runtime_root"] == str(tmp_path)
     assert report["directories"]["models_generation"]["exists"] is False
     assert report["directories"]["outputs_images"]["exists"] is False
+    assert report["directories"]["outputs_image_checks"]["exists"] is False
 
 
 def test_download_manifest_contains_generation_and_scoring_entries():
@@ -34,6 +36,8 @@ def test_download_manifest_contains_generation_and_scoring_entries():
     manifest = get_model_manifest()
 
     assert manifest["sd15-electric"]["target"] == "generation"
+    assert manifest["ssd1b-electric"]["target"] == "generation"
+    assert manifest["ssd1b-electric"]["repo_id"] == "segmind/SSD-1B"
     assert manifest["unipic2-kontext"]["target"] == "generation"
     assert manifest["unipic2-kontext"]["repo_id"] == "Skywork/UniPic2-SD3.5M-Kontext-2B"
     assert manifest["image-reward"]["target"] == "scoring"
@@ -54,7 +58,21 @@ def test_download_manifest_prefers_configured_legacy_root(monkeypatch, tmp_path)
     assert manifest["aesthetic-predictor"]["local_source"] == str(weight_file)
 
 
+def test_download_manifest_uses_public_aesthetic_source_when_local_weight_missing(monkeypatch, tmp_path):
+    from app.core.settings import Settings
+    from scripts.download_models import DEFAULT_AESTHETIC_WEIGHT_URL, get_model_manifest
+
+    legacy_root = tmp_path / "missing-legacy"
+    monkeypatch.setenv("ELECTRIC_AI_LEGACY_ROOT", str(legacy_root))
+
+    manifest = get_model_manifest(Settings(runtime_root=tmp_path / "runtime"))
+
+    assert manifest["aesthetic-predictor"]["local_source"] == DEFAULT_AESTHETIC_WEIGHT_URL
+
+
 def test_runtime_probe_script_runs_from_cli():
+    from app.core.settings import DEFAULT_RUNTIME_ROOT
+
     result = subprocess.run(
         [sys.executable, "scripts/runtime_probe.py"],
         cwd=Path(__file__).resolve().parents[1],
@@ -64,7 +82,7 @@ def test_runtime_probe_script_runs_from_cli():
     )
 
     assert result.returncode == 0
-    assert '"runtime_root": "G:\\\\electric-ai-runtime"' in result.stdout
+    assert f'"runtime_root": "{str(DEFAULT_RUNTIME_ROOT)}"' in result.stdout
 
 
 def test_download_models_script_check_runs_from_cli():
@@ -102,6 +120,58 @@ def test_download_huggingface_retries_after_chunk_error(tmp_path):
 
     assert result["status"] == "downloaded"
     assert attempts["count"] == 2
+
+
+def test_copy_local_weight_downloads_remote_source(monkeypatch, tmp_path):
+    from scripts.download_models import _copy_local_weight
+
+    calls: list[tuple[str, str]] = []
+
+    def fake_urlretrieve(source: str, destination: str):
+        calls.append((source, destination))
+        Path(destination).write_text("stub-weight", encoding="utf-8")
+        return destination, None
+
+    monkeypatch.setattr("scripts.download_models.urlretrieve", fake_urlretrieve)
+
+    destination_dir = tmp_path / "aesthetic-predictor"
+    result = _copy_local_weight(
+        {
+            "local_source": "https://example.com/sac+logos+ava1-l14-linearMSE.pth",
+            "local_dir": str(destination_dir),
+        }
+    )
+
+    assert result["status"] == "downloaded"
+    assert calls == [
+        (
+            "https://example.com/sac+logos+ava1-l14-linearMSE.pth",
+            str(destination_dir / "sac+logos+ava1-l14-linearMSE.pth"),
+        )
+    ]
+
+
+def test_copy_local_weight_decodes_remote_filename(monkeypatch, tmp_path):
+    from scripts.download_models import _copy_local_weight
+
+    calls: list[tuple[str, str]] = []
+
+    def fake_urlretrieve(source: str, destination: str):
+        calls.append((source, destination))
+        Path(destination).write_text("stub-weight", encoding="utf-8")
+        return destination, None
+
+    monkeypatch.setattr("scripts.download_models.urlretrieve", fake_urlretrieve)
+
+    destination_dir = tmp_path / "aesthetic-predictor"
+    result = _copy_local_weight(
+        {
+            "local_source": "https://example.com/sac%2Blogos%2Bava1-l14-linearMSE.pth",
+            "local_dir": str(destination_dir),
+        }
+    )
+
+    assert result["destination"] == str(destination_dir / "sac+logos+ava1-l14-linearMSE.pth")
 
 
 def test_settings_read_runtime_tuning_flags_from_env(monkeypatch, tmp_path):

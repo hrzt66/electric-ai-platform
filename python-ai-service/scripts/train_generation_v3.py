@@ -21,6 +21,7 @@ def main() -> int:
     parser.add_argument("--prepare-only", action="store_true", help="Only prepare the curated dataset and training plan.")
     parser.add_argument("--skip-merge", action="store_true", help="Skip merging LoRA weights into a standalone model.")
     parser.add_argument("--skip-eval", action="store_true", help="Skip validation image generation after merge.")
+    parser.add_argument("--num-train-epochs", type=int, default=None, help="Override the configured training epochs.")
     parser.add_argument("--max-train-steps", type=int, default=None, help="Override the configured training steps.")
     parser.add_argument("--max-train-samples", type=int, default=None, help="Limit the curated dataset size.")
     parser.add_argument("--python-executable", default=None, help="Python executable used to launch the LoRA trainer.")
@@ -28,6 +29,8 @@ def main() -> int:
     args = parser.parse_args()
 
     config = GenerationTrainingConfig()
+    if args.num_train_epochs is not None:
+        config = replace(config, num_train_epochs=args.num_train_epochs)
     if args.max_train_steps is not None:
         config = replace(config, max_train_steps=args.max_train_steps)
     if args.max_train_samples is not None:

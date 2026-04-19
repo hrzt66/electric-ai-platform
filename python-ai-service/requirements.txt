@@ -3,6 +3,7 @@ uvicorn==0.30.6
 pydantic==2.9.2
 setuptools==75.8.0
 pillow==10.4.0
+matplotlib==3.10.8
 pytest==8.3.3
 httpx==0.27.2
 redis==5.1.1
@@ -16,10 +17,10 @@ sentencepiece==0.2.0
 huggingface-hub==0.36.0
 peft==0.17.1
 protobuf==5.29.4
---extra-index-url https://download.pytorch.org/whl/cu124
-torch==2.6.0+cu124
-torchvision==0.21.0+cu124
-torchaudio==2.6.0+cu124
+pyyaml==6.0.2
+torch==2.11.0
+torchvision==0.26.0
+torchaudio==2.11.0
 image-reward==1.5
 clip-anytorch==2.6.0
 ftfy==6.3.1

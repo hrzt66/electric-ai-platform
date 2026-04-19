@@ -58,7 +58,7 @@ class FakeGenerationService:
         runtime.prepare(job)
         if self.fail:
             raise RuntimeError("generation exploded")
-        return [{"file_path": str(Path("G:/electric-ai-runtime/outputs/images/job-7.png"))}]
+        return [{"file_path": str(Path("model/image/job-7.png"))}]
 
 
 class FakeScoringService:

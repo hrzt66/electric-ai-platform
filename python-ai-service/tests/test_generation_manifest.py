@@ -36,7 +36,10 @@ def test_build_generation_manifest_uses_path_tokens_for_caption(tmp_path: Path) 
     )
 
     assert len(rows) == 1
-    assert rows[0]["caption"] == "electric power transmission line, insulator equipment"
+    assert (
+        rows[0]["caption"]
+        == "realistic utility inspection photography, electric power transmission line, insulator equipment"
+    )
 
 
 def test_build_generation_manifest_dedupes_exact_duplicate_files(tmp_path: Path) -> None:

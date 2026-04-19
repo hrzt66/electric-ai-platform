@@ -5,12 +5,16 @@ import {
   getAssetDetail,
   getTask,
   listAssetHistory,
+  listAssetHistoryPage,
   listModels,
   listTaskAuditEvents,
   listTasks,
 } from '../api/platform'
+import { localizeModelRecords } from '../model-copy'
 import type {
   AssetDetail,
+  AssetHistoryPage,
+  AssetHistoryPageQuery,
   AssetHistoryItem,
   AuditEvent,
   GenerateTask,
@@ -28,6 +32,28 @@ function isCacheFresh(timestamp: number, ttl = CACHE_TTL_MS) {
 function ensureArray<T>(value: T[] | null | undefined): T[] {
   // 后端偶发返回 null 时，在 store 层兜底为 []，避免页面计算属性直接崩掉。
   return Array.isArray(value) ? value : []
+}
+
+function ensureHistoryPage(value: AssetHistoryPage | null | undefined): AssetHistoryPage {
+  return {
+    items: ensureArray(value?.items),
+    page: typeof value?.page === 'number' && value.page > 0 ? value.page : 1,
+    page_size: typeof value?.page_size === 'number' && value.page_size > 0 ? value.page_size : 10,
+    total: typeof value?.total === 'number' && value.total >= 0 ? value.total : 0,
+    total_pages: typeof value?.total_pages === 'number' && value.total_pages >= 0 ? value.total_pages : 0,
+  }
+}
+
+function dedupeCurrentTaskAssets(items: AssetHistoryItem[]) {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = `${item.job_id}:${item.image_name || item.file_path}`
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
 }
 
 function extractErrorMessage(error: unknown, fallback: string) {
@@ -51,6 +77,11 @@ type PlatformState = {
   models: ModelRecord[]
   tasks: GenerateTask[]
   history: AssetHistoryItem[]
+  historyPageItems: AssetHistoryItem[]
+  historyPage: number
+  historyPageSize: number
+  historyTotal: number
+  historyTotalPages: number
   currentTask: GenerateTask | null
   currentAssets: AssetHistoryItem[]
   currentTaskAudit: AuditEvent[]
@@ -58,10 +89,12 @@ type PlatformState = {
   submitting: boolean
   loadingTasks: boolean
   loadingHistory: boolean
+  loadingHistoryPage: boolean
   loadingModels: boolean
   loadingTask: boolean
   tasksLoadError: string | null
   historyLoadError: string | null
+  historyPageLoadError: string | null
   modelsLoadError: string | null
   taskLoadError: string | null
   tasksLoadedAt: number
@@ -71,6 +104,7 @@ type PlatformState = {
   historyRequest: Promise<AssetHistoryItem[]> | null
   modelsRequest: Promise<ModelRecord[]> | null
   taskRequests: Record<number, Promise<GenerateTask>>
+  historyPageRequestToken: number
 }
 
 export const usePlatformStore = defineStore('platform', {
@@ -78,6 +112,11 @@ export const usePlatformStore = defineStore('platform', {
     models: [],
     tasks: [],
     history: [],
+    historyPageItems: [],
+    historyPage: 1,
+    historyPageSize: 10,
+    historyTotal: 0,
+    historyTotalPages: 0,
     currentTask: null,
     currentAssets: [],
     currentTaskAudit: [],
@@ -85,10 +124,12 @@ export const usePlatformStore = defineStore('platform', {
     submitting: false,
     loadingTasks: false,
     loadingHistory: false,
+    loadingHistoryPage: false,
     loadingModels: false,
     loadingTask: false,
     tasksLoadError: null,
     historyLoadError: null,
+    historyPageLoadError: null,
     modelsLoadError: null,
     taskLoadError: null,
     tasksLoadedAt: 0,
@@ -98,6 +139,7 @@ export const usePlatformStore = defineStore('platform', {
     historyRequest: null,
     modelsRequest: null,
     taskRequests: {},
+    historyPageRequestToken: 0,
   }),
   getters: {
     currentTaskId(state) {
@@ -177,7 +219,7 @@ export const usePlatformStore = defineStore('platform', {
 
       const request = listModels()
         .then((models) => {
-          this.models = ensureArray(models)
+          this.models = localizeModelRecords(ensureArray(models))
           this.modelsLoadedAt = Date.now()
           return this.models
         })
@@ -234,6 +276,47 @@ export const usePlatformStore = defineStore('platform', {
       return request
     },
 
+    async fetchHistoryPage(query: AssetHistoryPageQuery) {
+      const normalizedQuery: AssetHistoryPageQuery = {
+        page: query.page > 0 ? query.page : 1,
+        page_size: query.page_size > 0 ? query.page_size : 10,
+        prompt_keyword: query.prompt_keyword ?? '',
+        model_name: query.model_name ?? '',
+        status: query.status ?? 'all',
+        min_total_score: query.min_total_score ?? 0,
+      }
+      const requestToken = this.historyPageRequestToken + 1
+      this.historyPageRequestToken = requestToken
+      this.historyPage = normalizedQuery.page
+      this.historyPageSize = normalizedQuery.page_size
+      this.loadingHistoryPage = true
+      this.historyPageLoadError = null
+
+      try {
+        const result = await listAssetHistoryPage(normalizedQuery)
+        if (this.historyPageRequestToken !== requestToken) {
+          return result
+        }
+
+        const safePage = ensureHistoryPage(result)
+        this.historyPageItems = safePage.items
+        this.historyPage = safePage.page
+        this.historyPageSize = safePage.page_size
+        this.historyTotal = safePage.total
+        this.historyTotalPages = safePage.total_pages
+        return safePage
+      } catch (error) {
+        if (this.historyPageRequestToken === requestToken) {
+          this.historyPageLoadError = extractErrorMessage(error, '历史分页加载失败')
+        }
+        throw error
+      } finally {
+        if (this.historyPageRequestToken === requestToken) {
+          this.loadingHistoryPage = false
+        }
+      }
+    },
+
     async refreshTask(taskId: number) {
       if (this.taskRequests[taskId]) {
         return this.taskRequests[taskId]
@@ -271,7 +354,9 @@ export const usePlatformStore = defineStore('platform', {
         return
       }
       // 当前工作台只展示“当前任务”的资产切片，历史中心再展示完整列表。
-      this.currentAssets = ensureArray(this.history).filter((item) => item.job_id === this.currentTask?.id)
+      this.currentAssets = dedupeCurrentTaskAssets(
+        ensureArray(this.history).filter((item) => item.job_id === this.currentTask?.id),
+      )
     },
 
     async fetchTaskAudit(taskId: number) {

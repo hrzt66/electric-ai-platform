@@ -18,6 +18,8 @@ class RuntimeModelManifestEntry(BaseModel):
     local_source: str | None = None
     local_dir: str
     description: str = ""
+    allow_patterns: list[str] | None = None
+    ignore_patterns: list[str] | None = None
 
 
 class RuntimeProbeReport(BaseModel):

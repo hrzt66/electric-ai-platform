@@ -10,12 +10,13 @@ import (
 )
 
 type Upstreams struct {
-	Auth  *httputil.ReverseProxy
-	Model *httputil.ReverseProxy
-	Task  *httputil.ReverseProxy
-	Asset *httputil.ReverseProxy
-	Audit *httputil.ReverseProxy
-	Files http.Handler
+	Auth        *httputil.ReverseProxy
+	Model       *httputil.ReverseProxy
+	Task        *httputil.ReverseProxy
+	Asset       *httputil.ReverseProxy
+	Audit       *httputil.ReverseProxy
+	Files       http.Handler
+	ImageChecks http.Handler
 }
 
 func New(upstreams Upstreams) *gin.Engine {
@@ -36,5 +37,10 @@ func New(upstreams Upstreams) *gin.Engine {
 	secured.Any("/api/v1/audit/*path", gin.WrapH(upstreams.Audit))
 
 	r.Any("/files/images/*path", gin.WrapH(upstreams.Files))
+	if upstreams.ImageChecks != nil {
+		r.Any("/files/image-checks/*path", gin.WrapH(upstreams.ImageChecks))
+	} else {
+		r.Any("/files/image-checks/*path", gin.WrapH(upstreams.Files))
+	}
 	return r
 }

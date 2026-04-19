@@ -12,7 +12,7 @@ def merge_lora_weights(
     lora_output_dir: Path,
     merged_model_dir: Path,
 ) -> Path:
-    dtype = torch.float16
+    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     pipeline = StableDiffusionPipeline.from_pretrained(
         base_model_name_or_path,
         torch_dtype=dtype,

@@ -6,6 +6,8 @@ import os
 import shutil
 import time
 from pathlib import Path
+from urllib.parse import unquote, urlparse
+from urllib.request import urlretrieve
 
 try:
     from scripts.bootstrap import ensure_project_root_on_path
@@ -21,6 +23,10 @@ from requests.exceptions import ChunkedEncodingError
 
 DEFAULT_LEGACY_PROJECT_ROOT = Path(r"E:\毕业设计\源代码\Project")
 AESTHETIC_WEIGHT_FILENAME = "sac+logos+ava1-l14-linearMSE.pth"
+DEFAULT_AESTHETIC_WEIGHT_URL = (
+    "https://raw.githubusercontent.com/christophschuhmann/improved-aesthetic-predictor/main/"
+    "sac%2Blogos%2Bava1-l14-linearMSE.pth"
+)
 
 
 def get_legacy_project_root() -> Path:
@@ -28,15 +34,20 @@ def get_legacy_project_root() -> Path:
     return Path(value) if value else DEFAULT_LEGACY_PROJECT_ROOT
 
 
-def resolve_aesthetic_weight_source(settings: Settings) -> Path:
+def resolve_aesthetic_weight_source(settings: Settings) -> str:
     candidates = [
         get_legacy_project_root() / AESTHETIC_WEIGHT_FILENAME,
         settings.scoring_model_dir / "aesthetic-predictor" / AESTHETIC_WEIGHT_FILENAME,
     ]
     for candidate in candidates:
         if candidate.exists():
-            return candidate
-    return candidates[0]
+            return str(candidate)
+    return DEFAULT_AESTHETIC_WEIGHT_URL
+
+
+def _is_remote_source(source: str) -> bool:
+    parsed = urlparse(source)
+    return parsed.scheme in {"http", "https"}
 
 
 def get_model_manifest(settings: Settings | None = None) -> dict[str, dict[str, str | None]]:
@@ -58,6 +69,28 @@ def get_model_manifest(settings: Settings | None = None) -> dict[str, dict[str, 
             source="local-runtime",
             local_dir=str(paths.models_generation / "sd15-electric-specialized"),
             description="Electric-domain specialized SD1.5 deployment model",
+        ),
+        "ssd1b-electric": RuntimeModelManifestEntry(
+            name="ssd1b-electric",
+            target="generation",
+            source="huggingface",
+            repo_id="segmind/SSD-1B",
+            local_dir=str(paths.models_generation / "ssd1b-electric"),
+            description="SSD-1B SDXL distilled generation runtime for Apple Silicon Macs",
+            allow_patterns=[
+                "model_index.json",
+                "scheduler/*",
+                "text_encoder/config.json",
+                "text_encoder/model.fp16.safetensors",
+                "text_encoder_2/config.json",
+                "text_encoder_2/model.fp16.safetensors",
+                "tokenizer/*",
+                "tokenizer_2/*",
+                "unet/config.json",
+                "unet/diffusion_pytorch_model.fp16.safetensors",
+                "vae/config.json",
+                "vae/diffusion_pytorch_model.fp16.safetensors",
+            ],
         ),
         "unipic2-kontext": RuntimeModelManifestEntry(
             name="unipic2-kontext",
@@ -88,10 +121,21 @@ def get_model_manifest(settings: Settings | None = None) -> dict[str, dict[str, 
 
 
 def _copy_local_weight(entry: dict[str, str | None]) -> dict[str, object]:
-    source = Path(entry["local_source"] or "")
+    source_value = entry["local_source"] or ""
     destination_dir = Path(entry["local_dir"])
     destination_dir.mkdir(parents=True, exist_ok=True)
-    destination_path = destination_dir / source.name
+    filename = unquote(Path(urlparse(source_value).path).name) or AESTHETIC_WEIGHT_FILENAME
+    destination_path = destination_dir / filename
+
+    if _is_remote_source(source_value):
+        urlretrieve(source_value, str(destination_path))
+        return {
+            "status": "downloaded",
+            "source": source_value,
+            "destination": str(destination_path),
+        }
+
+    source = Path(source_value)
 
     if not source.exists():
         return {
@@ -138,6 +182,8 @@ def _download_huggingface(
                 local_dir_use_symlinks=False,
                 max_workers=max_workers,
                 resume_download=True,
+                allow_patterns=entry.get("allow_patterns"),
+                ignore_patterns=entry.get("ignore_patterns"),
             )
             return {
                 "status": "downloaded",

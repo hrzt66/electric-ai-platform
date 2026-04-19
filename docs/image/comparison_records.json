@@ -1,0 +1,578 @@
+[
+  {
+    "prompt_index": 1,
+    "prompt": "modern electrical substation yard, high-voltage breakers and transformers, stainless steel busbars, gravel ground, safety fencing, warning signage sharp and legible, tidy cables, cinematic depth of field",
+    "model_name": "sd15-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_01_sd15-electric.png",
+    "generation_seconds": 19.9969,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 82.58,
+        "text_consistency": 74.45,
+        "physical_plausibility": 36.86,
+        "composition_aesthetics": 63.51,
+        "total_score": 65.17
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 53.52,
+        "text_consistency": 43.24,
+        "physical_plausibility": 37.64,
+        "composition_aesthetics": 65.81,
+        "total_score": 48.12
+      }
+    }
+  },
+  {
+    "prompt_index": 1,
+    "prompt": "modern electrical substation yard, high-voltage breakers and transformers, stainless steel busbars, gravel ground, safety fencing, warning signage sharp and legible, tidy cables, cinematic depth of field",
+    "model_name": "sd15-electric-specialized",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_01_sd15-electric-specialized.png",
+    "generation_seconds": 26.2007,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 81.92,
+        "text_consistency": 47.1,
+        "physical_plausibility": 71.3,
+        "composition_aesthetics": 63.48,
+        "total_score": 63.17
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 47.58,
+        "text_consistency": 34.51,
+        "physical_plausibility": 31.37,
+        "composition_aesthetics": 60.25,
+        "total_score": 41.13
+      }
+    }
+  },
+  {
+    "prompt_index": 1,
+    "prompt": "modern electrical substation yard, high-voltage breakers and transformers, stainless steel busbars, gravel ground, safety fencing, warning signage sharp and legible, tidy cables, cinematic depth of field",
+    "model_name": "ssd1b-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_01_ssd1b-electric.png",
+    "generation_seconds": 59.7498,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 82.59,
+        "text_consistency": 29.74,
+        "physical_plausibility": 78.12,
+        "composition_aesthetics": 63.46,
+        "total_score": 58.52
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 54.46,
+        "text_consistency": 36.65,
+        "physical_plausibility": 33.1,
+        "composition_aesthetics": 65.97,
+        "total_score": 44.82
+      }
+    }
+  },
+  {
+    "prompt_index": 2,
+    "prompt": "aerial view of steel lattice transmission towers marching across landscape, taut conductors, wide right-of-way, realistic insulators, rolling terrain, clear sky",
+    "model_name": "sd15-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_02_sd15-electric.png",
+    "generation_seconds": 16.5145,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 79.83,
+        "text_consistency": 68.51,
+        "physical_plausibility": 70.06,
+        "composition_aesthetics": 63.54,
+        "total_score": 70.36
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 57.58,
+        "text_consistency": 36.52,
+        "physical_plausibility": 33.51,
+        "composition_aesthetics": 68.97,
+        "total_score": 46.06
+      }
+    }
+  },
+  {
+    "prompt_index": 2,
+    "prompt": "aerial view of steel lattice transmission towers marching across landscape, taut conductors, wide right-of-way, realistic insulators, rolling terrain, clear sky",
+    "model_name": "sd15-electric-specialized",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_02_sd15-electric-specialized.png",
+    "generation_seconds": 25.4662,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 80.28,
+        "text_consistency": 81.25,
+        "physical_plausibility": 58.2,
+        "composition_aesthetics": 63.55,
+        "total_score": 72.33
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 49.9,
+        "text_consistency": 32.81,
+        "physical_plausibility": 30.91,
+        "composition_aesthetics": 64.38,
+        "total_score": 41.63
+      }
+    }
+  },
+  {
+    "prompt_index": 2,
+    "prompt": "aerial view of steel lattice transmission towers marching across landscape, taut conductors, wide right-of-way, realistic insulators, rolling terrain, clear sky",
+    "model_name": "ssd1b-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_02_ssd1b-electric.png",
+    "generation_seconds": 54.579,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 77.62,
+        "text_consistency": 71.87,
+        "physical_plausibility": 39.94,
+        "composition_aesthetics": 63.46,
+        "total_score": 63.9
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 45.69,
+        "text_consistency": 31.81,
+        "physical_plausibility": 29.41,
+        "composition_aesthetics": 57.86,
+        "total_score": 38.84
+      }
+    }
+  },
+  {
+    "prompt_index": 3,
+    "prompt": "grid control room, wall of SCADA screens, operators at desks, LED status panels, cool white lighting, cable management neat, reflective floor, photorealistic optics",
+    "model_name": "sd15-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_03_sd15-electric.png",
+    "generation_seconds": 16.7759,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 80.27,
+        "text_consistency": 79.51,
+        "physical_plausibility": 80.07,
+        "composition_aesthetics": 63.45,
+        "total_score": 76.91
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 52.88,
+        "text_consistency": 35.46,
+        "physical_plausibility": 32.79,
+        "composition_aesthetics": 66.73,
+        "total_score": 44.11
+      }
+    }
+  },
+  {
+    "prompt_index": 3,
+    "prompt": "grid control room, wall of SCADA screens, operators at desks, LED status panels, cool white lighting, cable management neat, reflective floor, photorealistic optics",
+    "model_name": "sd15-electric-specialized",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_03_sd15-electric-specialized.png",
+    "generation_seconds": 25.0264,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 81.55,
+        "text_consistency": 76.74,
+        "physical_plausibility": 80.97,
+        "composition_aesthetics": 63.48,
+        "total_score": 76.38
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 47.53,
+        "text_consistency": 38.15,
+        "physical_plausibility": 34.44,
+        "composition_aesthetics": 63.01,
+        "total_score": 43.7
+      }
+    }
+  },
+  {
+    "prompt_index": 3,
+    "prompt": "grid control room, wall of SCADA screens, operators at desks, LED status panels, cool white lighting, cable management neat, reflective floor, photorealistic optics",
+    "model_name": "ssd1b-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_03_ssd1b-electric.png",
+    "generation_seconds": 54.486,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 81.22,
+        "text_consistency": 57.15,
+        "physical_plausibility": 76.68,
+        "composition_aesthetics": 63.51,
+        "total_score": 68.04
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 47.43,
+        "text_consistency": 32.11,
+        "physical_plausibility": 30.02,
+        "composition_aesthetics": 61.28,
+        "total_score": 40.08
+      }
+    }
+  },
+  {
+    "prompt_index": 4,
+    "prompt": "utility-scale wind turbines on gentle hills, aligned rows, late afternoon sun, long shadows, crisp blades, realistic nacelles, minimal haze",
+    "model_name": "sd15-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_04_sd15-electric.png",
+    "generation_seconds": 17.2565,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 81.14,
+        "text_consistency": 73.8,
+        "physical_plausibility": 69.22,
+        "composition_aesthetics": 63.46,
+        "total_score": 72.38
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 45.94,
+        "text_consistency": 32.79,
+        "physical_plausibility": 31.14,
+        "composition_aesthetics": 64.25,
+        "total_score": 40.82
+      }
+    }
+  },
+  {
+    "prompt_index": 4,
+    "prompt": "utility-scale wind turbines on gentle hills, aligned rows, late afternoon sun, long shadows, crisp blades, realistic nacelles, minimal haze",
+    "model_name": "sd15-electric-specialized",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_04_sd15-electric-specialized.png",
+    "generation_seconds": 23.4287,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 3.65,
+        "text_consistency": 54.74,
+        "physical_plausibility": 58.97,
+        "composition_aesthetics": 63.46,
+        "total_score": 46.6
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 46.25,
+        "text_consistency": 35.95,
+        "physical_plausibility": 32.99,
+        "composition_aesthetics": 62.15,
+        "total_score": 42.12
+      }
+    }
+  },
+  {
+    "prompt_index": 4,
+    "prompt": "utility-scale wind turbines on gentle hills, aligned rows, late afternoon sun, long shadows, crisp blades, realistic nacelles, minimal haze",
+    "model_name": "ssd1b-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_04_ssd1b-electric.png",
+    "generation_seconds": 57.7032,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 74.22,
+        "text_consistency": 67.09,
+        "physical_plausibility": 54.24,
+        "composition_aesthetics": 63.47,
+        "total_score": 64.85
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 44.45,
+        "text_consistency": 31.65,
+        "physical_plausibility": 30.01,
+        "composition_aesthetics": 60.36,
+        "total_score": 39.11
+      }
+    }
+  },
+  {
+    "prompt_index": 5,
+    "prompt": "large photovoltaic farm, endless rows of blue PV panels, tracked mounting racks, clean gravel paths, cable trays, realistic inverters, midday sun",
+    "model_name": "sd15-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_05_sd15-electric.png",
+    "generation_seconds": 18.8857,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 81.18,
+        "text_consistency": 72.97,
+        "physical_plausibility": 81.37,
+        "composition_aesthetics": 63.45,
+        "total_score": 75.0
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 42.18,
+        "text_consistency": 36.36,
+        "physical_plausibility": 33.32,
+        "composition_aesthetics": 60.22,
+        "total_score": 41.15
+      }
+    }
+  },
+  {
+    "prompt_index": 5,
+    "prompt": "large photovoltaic farm, endless rows of blue PV panels, tracked mounting racks, clean gravel paths, cable trays, realistic inverters, midday sun",
+    "model_name": "sd15-electric-specialized",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_05_sd15-electric-specialized.png",
+    "generation_seconds": 23.5184,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 75.27,
+        "text_consistency": 58.26,
+        "physical_plausibility": 81.58,
+        "composition_aesthetics": 63.45,
+        "total_score": 68.36
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 42.07,
+        "text_consistency": 33.08,
+        "physical_plausibility": 31.24,
+        "composition_aesthetics": 60.86,
+        "total_score": 39.53
+      }
+    }
+  },
+  {
+    "prompt_index": 5,
+    "prompt": "large photovoltaic farm, endless rows of blue PV panels, tracked mounting racks, clean gravel paths, cable trays, realistic inverters, midday sun",
+    "model_name": "ssd1b-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_05_ssd1b-electric.png",
+    "generation_seconds": 51.4763,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 75.19,
+        "text_consistency": 74.67,
+        "physical_plausibility": 79.03,
+        "composition_aesthetics": 63.42,
+        "total_score": 73.8
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 41.44,
+        "text_consistency": 32.72,
+        "physical_plausibility": 30.58,
+        "composition_aesthetics": 58.2,
+        "total_score": 38.62
+      }
+    }
+  },
+  {
+    "prompt_index": 6,
+    "prompt": "massive concrete hydroelectric dam, spillway gates, turbulent discharge water, mist, safety railings, mountain backdrop, overcast soft light",
+    "model_name": "sd15-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_06_sd15-electric.png",
+    "generation_seconds": 21.7463,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 80.3,
+        "text_consistency": 68.02,
+        "physical_plausibility": 75.3,
+        "composition_aesthetics": 63.42,
+        "total_score": 71.52
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 52.34,
+        "text_consistency": 36.46,
+        "physical_plausibility": 33.94,
+        "composition_aesthetics": 69.23,
+        "total_score": 45.09
+      }
+    }
+  },
+  {
+    "prompt_index": 6,
+    "prompt": "massive concrete hydroelectric dam, spillway gates, turbulent discharge water, mist, safety railings, mountain backdrop, overcast soft light",
+    "model_name": "sd15-electric-specialized",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_06_sd15-electric-specialized.png",
+    "generation_seconds": 24.6321,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 81.88,
+        "text_consistency": 62.75,
+        "physical_plausibility": 78.25,
+        "composition_aesthetics": 63.4,
+        "total_score": 70.6
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 47.99,
+        "text_consistency": 36.65,
+        "physical_plausibility": 33.54,
+        "composition_aesthetics": 63.89,
+        "total_score": 43.19
+      }
+    }
+  },
+  {
+    "prompt_index": 6,
+    "prompt": "massive concrete hydroelectric dam, spillway gates, turbulent discharge water, mist, safety railings, mountain backdrop, overcast soft light",
+    "model_name": "ssd1b-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_06_ssd1b-electric.png",
+    "generation_seconds": 54.5377,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 80.64,
+        "text_consistency": 79.03,
+        "physical_plausibility": 76.63,
+        "composition_aesthetics": 63.4,
+        "total_score": 75.98
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 50.57,
+        "text_consistency": 40.68,
+        "physical_plausibility": 36.05,
+        "composition_aesthetics": 63.75,
+        "total_score": 45.8
+      }
+    }
+  },
+  {
+    "prompt_index": 7,
+    "prompt": "linemen performing night maintenance on transmission tower, bucket truck, headlamps, portable work lights casting rim light, reflective safety vests, visible harnesses, wet asphalt after rain",
+    "model_name": "sd15-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_07_sd15-electric.png",
+    "generation_seconds": 23.7019,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 82.43,
+        "text_consistency": 57.23,
+        "physical_plausibility": 80.53,
+        "composition_aesthetics": 63.43,
+        "total_score": 69.23
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 53.18,
+        "text_consistency": 34.28,
+        "physical_plausibility": 32.39,
+        "composition_aesthetics": 69.41,
+        "total_score": 44.12
+      }
+    }
+  },
+  {
+    "prompt_index": 7,
+    "prompt": "linemen performing night maintenance on transmission tower, bucket truck, headlamps, portable work lights casting rim light, reflective safety vests, visible harnesses, wet asphalt after rain",
+    "model_name": "sd15-electric-specialized",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_07_sd15-electric-specialized.png",
+    "generation_seconds": 24.9225,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 78.12,
+        "text_consistency": 64.88,
+        "physical_plausibility": 65.31,
+        "composition_aesthetics": 63.51,
+        "total_score": 67.52
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 51.65,
+        "text_consistency": 48.9,
+        "physical_plausibility": 41.81,
+        "composition_aesthetics": 66.3,
+        "total_score": 50.91
+      }
+    }
+  },
+  {
+    "prompt_index": 7,
+    "prompt": "linemen performing night maintenance on transmission tower, bucket truck, headlamps, portable work lights casting rim light, reflective safety vests, visible harnesses, wet asphalt after rain",
+    "model_name": "ssd1b-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_07_ssd1b-electric.png",
+    "generation_seconds": 58.4432,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 82.16,
+        "text_consistency": 45.54,
+        "physical_plausibility": 49.02,
+        "composition_aesthetics": 63.47,
+        "total_score": 57.29
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 54.58,
+        "text_consistency": 36.66,
+        "physical_plausibility": 33.72,
+        "composition_aesthetics": 68.82,
+        "total_score": 45.51
+      }
+    }
+  },
+  {
+    "prompt_index": 8,
+    "prompt": "wind turbines on grassland, modern wind power station, tall white turbine, clear sky, sunlight, realistic, clean composition, high detail, cinematic lighting",
+    "model_name": "sd15-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_08_sd15-electric.png",
+    "generation_seconds": 24.5107,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 37.52,
+        "text_consistency": 58.34,
+        "physical_plausibility": 72.3,
+        "composition_aesthetics": 63.45,
+        "total_score": 58.24
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 46.99,
+        "text_consistency": 36.22,
+        "physical_plausibility": 33.37,
+        "composition_aesthetics": 64.73,
+        "total_score": 42.93
+      }
+    }
+  },
+  {
+    "prompt_index": 8,
+    "prompt": "wind turbines on grassland, modern wind power station, tall white turbine, clear sky, sunlight, realistic, clean composition, high detail, cinematic lighting",
+    "model_name": "sd15-electric-specialized",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_08_sd15-electric-specialized.png",
+    "generation_seconds": 23.8487,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 77.45,
+        "text_consistency": 50.54,
+        "physical_plausibility": 65.97,
+        "composition_aesthetics": 63.48,
+        "total_score": 62.22
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 40.35,
+        "text_consistency": 32.46,
+        "physical_plausibility": 30.58,
+        "composition_aesthetics": 59.54,
+        "total_score": 38.54
+      }
+    }
+  },
+  {
+    "prompt_index": 8,
+    "prompt": "wind turbines on grassland, modern wind power station, tall white turbine, clear sky, sunlight, realistic, clean composition, high detail, cinematic lighting",
+    "model_name": "ssd1b-electric",
+    "seed": 42,
+    "image_path": "docs/image/paper-ready/generated/prompt_08_ssd1b-electric.png",
+    "generation_seconds": 84.8096,
+    "scores": {
+      "electric-score-v1": {
+        "visual_fidelity": 81.14,
+        "text_consistency": 75.62,
+        "physical_plausibility": 72.19,
+        "composition_aesthetics": 63.44,
+        "total_score": 73.76
+      },
+      "electric-score-v2": {
+        "visual_fidelity": 57.2,
+        "text_consistency": 44.37,
+        "physical_plausibility": 39.18,
+        "composition_aesthetics": 71.93,
+        "total_score": 50.78
+      }
+    }
+  }
+]

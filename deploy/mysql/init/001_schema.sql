@@ -86,6 +86,16 @@ CREATE TABLE asset_image_scores (
     CONSTRAINT fk_asset_image_scores_image FOREIGN KEY (image_id) REFERENCES asset_images(id) ON DELETE CASCADE
 );
 
+CREATE TABLE asset_image_score_explanations (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    image_id BIGINT NOT NULL,
+    checked_image_path VARCHAR(512) NULL,
+    explanation_json LONGTEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_asset_image_score_explanations_image_id (image_id),
+    CONSTRAINT fk_asset_image_score_explanations_image FOREIGN KEY (image_id) REFERENCES asset_images(id) ON DELETE CASCADE
+);
+
 CREATE TABLE audit_task_events (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     job_id BIGINT NOT NULL,

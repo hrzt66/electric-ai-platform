@@ -1,0 +1,170 @@
+[
+  {
+    "filename": "01_generation_prompt_overview_grid.png",
+    "title": "固定 Prompt 集生成结果总览",
+    "section": "生成结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "02_generation_prompt_01_model_compare.png",
+    "title": "Prompt 1 生成结果对比图",
+    "section": "生成结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "03_generation_prompt_02_model_compare.png",
+    "title": "Prompt 2 生成结果对比图",
+    "section": "生成结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "04_generation_prompt_03_model_compare.png",
+    "title": "Prompt 3 生成结果对比图",
+    "section": "生成结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "05_generation_prompt_04_model_compare.png",
+    "title": "Prompt 4 生成结果对比图",
+    "section": "生成结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "06_generation_prompt_05_model_compare.png",
+    "title": "Prompt 5 生成结果对比图",
+    "section": "生成结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "07_generation_prompt_06_model_compare.png",
+    "title": "Prompt 6 生成结果对比图",
+    "section": "生成结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "08_generation_prompt_07_model_compare.png",
+    "title": "Prompt 7 生成结果对比图",
+    "section": "生成结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "09_generation_prompt_08_model_compare.png",
+    "title": "Prompt 8 生成结果对比图",
+    "section": "生成结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "10_generation_training_loss_curve.png",
+    "title": "生成模型训练损失曲线",
+    "section": "生成模型训练结果分析",
+    "source": "model/training/generation/sd15-electric-specialized-v2/training.log"
+  },
+  {
+    "filename": "11_generation_lr_decay_curve.png",
+    "title": "生成模型学习率衰减曲线",
+    "section": "生成模型训练结果分析",
+    "source": "model/training/generation/sd15-electric-specialized-v2/training.log"
+  },
+  {
+    "filename": "12_generation_progress_throughput_curve.png",
+    "title": "生成模型训练进度与吞吐率图",
+    "section": "生成模型训练结果分析",
+    "source": "model/training/generation/sd15-electric-specialized-v2/training.log"
+  },
+  {
+    "filename": "13_scoring_pipeline_baseline_vs_student.png",
+    "title": "主流评分模型组合基线与自训练评分器结构对比",
+    "section": "评分模型设计",
+    "source": "python-ai-service/app/services/scoring_service.py"
+  },
+  {
+    "filename": "14_scoring_v2_training_loss_curve.png",
+    "title": "自训练评分模型训练损失曲线",
+    "section": "评分模型训练结果分析",
+    "source": "model/training/scoring/electric-score-v2/history.json"
+  },
+  {
+    "filename": "15_scoring_v2_lr_curve.png",
+    "title": "自训练评分模型学习率曲线",
+    "section": "评分模型训练结果分析",
+    "source": "python-ai-service/training/scoring/config.py"
+  },
+  {
+    "filename": "16_scoring_v2_progress_curve.png",
+    "title": "自训练评分模型训练进度图",
+    "section": "评分模型训练结果分析",
+    "source": "model/training/scoring/electric-score-v2/history.json"
+  },
+  {
+    "filename": "17_scoring_v2_regression_mae.png",
+    "title": "自训练评分模型各维度回归误差图",
+    "section": "评分模型训练结果分析",
+    "source": "model/scoring/electric-score-v2/metrics.json"
+  },
+  {
+    "filename": "18_yolo_training_loss_curve.png",
+    "title": "YOLO 辅助检测训练损失曲线",
+    "section": "辅助检测模型训练结果分析",
+    "source": "model/training/scoring/electric-score-v2/yolo-mps-compact-noval/train100/results.csv"
+  },
+  {
+    "filename": "19_yolo_lr_curve.png",
+    "title": "YOLO 辅助检测学习率曲线",
+    "section": "辅助检测模型训练结果分析",
+    "source": "model/training/scoring/electric-score-v2/yolo-mps-compact-noval/train100/results.csv"
+  },
+  {
+    "filename": "20_yolo_progress_throughput_curve.png",
+    "title": "YOLO 辅助检测训练进度与吞吐率图",
+    "section": "辅助检测模型训练结果分析",
+    "source": "model/training/scoring/electric-score-v2/yolo-mps-compact-noval/train100/results.csv"
+  },
+  {
+    "filename": "21_yolo_detection_metrics.png",
+    "title": "YOLO 辅助检测指标图",
+    "section": "辅助检测模型训练结果分析",
+    "source": "model/scoring/electric-score-v2/metrics.json"
+  },
+  {
+    "filename": "22_average_total_score_compare.png",
+    "title": "固定 Prompt 集平均总分对比图",
+    "section": "实验结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "23_dimension_gain_compare.png",
+    "title": "各维度增益对比图",
+    "section": "实验结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "24_total_score_boxplot.png",
+    "title": "总分箱线图",
+    "section": "实验结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "25_multidim_score_heatmap_v1.png",
+    "title": "多维度评分热力图（基线评分器）",
+    "section": "实验结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "26_multidim_score_heatmap_v2.png",
+    "title": "多维度评分热力图（自训练评分器）",
+    "section": "实验结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "27_prompt_win_count_compare.png",
+    "title": "固定 Prompt 集获胜次数统计图",
+    "section": "实验结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "28_generation_time_compare.png",
+    "title": "生成耗时对比图",
+    "section": "实验结果对比",
+    "source": "docs/image"
+  }
+]

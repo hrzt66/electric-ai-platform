@@ -16,14 +16,17 @@ class GenerationTrainingConfig:
     alpha: int = 32
     train_batch_size: int = 1
     gradient_accumulation_steps: int = 8
-    learning_rate: float = 1e-4
+    learning_rate: float = 5e-5
     lr_scheduler: str = "cosine"
     lr_warmup_steps: int = 200
-    max_train_steps: int = 6000
+    report_to: str = "all"
+    num_train_epochs: int = 100
+    max_train_steps: int | None = None
     checkpointing_steps: int = 500
+    enable_training_validation: bool = False
     validation_epochs: int = 1
     num_validation_images: int = 2
-    mixed_precision: str = "fp16"
+    mixed_precision: str = "no"
     use_8bit_adam: bool = False
     allow_tf32: bool = False
     gradient_checkpointing: bool = True
@@ -43,11 +46,17 @@ class GenerationTrainingConfig:
         ]
     )
 
+    def resolve_generation_model_root(self, settings: Settings) -> Path:
+        legacy_root = settings.runtime_root / "generation"
+        if legacy_root.exists():
+            return legacy_root
+        return settings.generation_model_dir
+
     def resolve_base_model_source(self, settings: Settings) -> str:
-        candidate = settings.generation_model_dir / "sd15-electric"
+        candidate = self.resolve_generation_model_root(settings) / "sd15-electric"
         if candidate.exists() and any(candidate.iterdir()):
             return str(candidate)
         return self.base_model_name
 
     def resolve_output_model_dir(self, settings: Settings) -> Path:
-        return settings.generation_model_dir / self.output_model_name
+        return self.resolve_generation_model_root(settings) / self.output_model_name

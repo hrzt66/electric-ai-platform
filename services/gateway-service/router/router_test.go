@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"electric-ai/services/gateway-service/service"
@@ -48,5 +50,33 @@ func TestTasksIndexIsProxiedWithoutRedirect(t *testing.T) {
 
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d with body %s", response.StatusCode, string(body))
+	}
+}
+
+func TestImageCheckFilesAreServedWithoutAuthentication(t *testing.T) {
+	tempDir := t.TempDir()
+	imagePath := filepath.Join(tempDir, "job-1.png")
+	if err := os.WriteFile(imagePath, []byte("checked-image"), 0o644); err != nil {
+		t.Fatalf("write temp image: %v", err)
+	}
+
+	engine := New(Upstreams{
+		Auth:  service.NewReverseProxy("http://example.com"),
+		Model: service.NewReverseProxy("http://example.com"),
+		Task:  service.NewReverseProxy("http://example.com"),
+		Asset: service.NewReverseProxy("http://example.com"),
+		Audit: service.NewReverseProxy("http://example.com"),
+		Files: service.NewStaticFileHandler(tempDir, "/files/image-checks/"),
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/files/image-checks/job-1.png", nil)
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if rec.Body.String() != "checked-image" {
+		t.Fatalf("unexpected body: %s", rec.Body.String())
 	}
 }

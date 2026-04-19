@@ -12,6 +12,7 @@ from app.core.runtime_paths import RuntimePaths
 from app.core.runtime_logging import configure_runtime_logging
 from app.core.settings import Settings, get_settings
 from app.runtimes.sd15_runtime import SD15Runtime
+from app.runtimes.ssd1b_runtime import SSD1BRuntime
 from app.runtimes.unipic2_runtime import UniPic2Runtime
 from scripts.download_models import get_model_manifest
 
@@ -33,6 +34,7 @@ class RuntimeRegistry:
         self._generation_runtime_factories: dict[str, Callable[[], Any]] = {
             "sd15-electric": self._build_sd15_runtime,
             "sd15-electric-specialized": self._build_sd15_specialized_runtime,
+            "ssd1b-electric": self._build_ssd1b_runtime,
             "unipic2-kontext": self._build_unipic2_runtime,
         }
         self._runtime_cache: dict[str, Any] = {}
@@ -113,6 +115,13 @@ class RuntimeRegistry:
         """构造电力行业专用 SD1.5 运行时实例。"""
         return SD15Runtime(
             model_dir=self._settings.generation_model_dir / "sd15-electric-specialized",
+            output_dir=self._settings.output_image_dir,
+        )
+
+    def _build_ssd1b_runtime(self) -> SSD1BRuntime:
+        """构造 SSD-1B 运行时实例。"""
+        return SSD1BRuntime(
+            model_dir=self._settings.generation_model_dir / "ssd1b-electric",
             output_dir=self._settings.output_image_dir,
         )
 

@@ -17,15 +17,19 @@ class RuntimePaths:
 
     @property
     def models_generation(self) -> Path:
-        return self.runtime_root / "models" / "generation"
+        return self.runtime_root / "generation"
 
     @property
     def models_scoring(self) -> Path:
-        return self.runtime_root / "models" / "scoring"
+        return self.runtime_root / "scoring"
 
     @property
     def outputs_images(self) -> Path:
-        return self.runtime_root / "outputs" / "images"
+        return self.runtime_root / "image"
+
+    @property
+    def outputs_image_checks(self) -> Path:
+        return self.runtime_root / "image_check"
 
     @property
     def logs(self) -> Path:
@@ -41,6 +45,7 @@ class RuntimePaths:
             "models_generation": self.models_generation,
             "models_scoring": self.models_scoring,
             "outputs_images": self.outputs_images,
+            "outputs_image_checks": self.outputs_image_checks,
             "logs": self.logs,
             "tmp": self.tmp,
         }

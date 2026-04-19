@@ -54,6 +54,8 @@ func getenvRequired(key string) (string, error) {
 
 // loadLocalEnvFiles 只在变量尚未显式注入时回填本地文件，避免覆盖 Docker / IDE 配置。
 func loadLocalEnvFiles() {
+	explicit := currentEnvKeys()
+
 	for _, path := range dotenvCandidates() {
 		values, err := godotenv.Read(path)
 		if err != nil {
@@ -61,11 +63,26 @@ func loadLocalEnvFiles() {
 		}
 
 		for key, value := range values {
-			if os.Getenv(key) == "" {
-				_ = os.Setenv(key, value)
+			if _, ok := explicit[key]; ok {
+				continue
 			}
+			_ = os.Setenv(key, value)
 		}
 	}
+}
+
+func currentEnvKeys() map[string]struct{} {
+	keys := make(map[string]struct{})
+	for _, entry := range os.Environ() {
+		for i := 0; i < len(entry); i++ {
+			if entry[i] != '=' {
+				continue
+			}
+			keys[entry[:i]] = struct{}{}
+			break
+		}
+	}
+	return keys
 }
 
 // dotenvCandidates 会把工作目录向上的 .env 与 .env.local 都纳入候选，

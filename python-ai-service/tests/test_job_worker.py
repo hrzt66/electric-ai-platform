@@ -9,7 +9,7 @@ class FakePipeline:
 
     def run(self, job):
         self.jobs.append(job)
-        return [{"file_path": "G:/electric-ai-runtime/outputs/images/7_0_11.png"}]
+        return [{"file_path": "model/image/7_0_11.png"}]
 
 
 class FakeRedis:

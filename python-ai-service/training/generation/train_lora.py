@@ -51,8 +51,6 @@ def build_lora_train_command(
         config.lr_scheduler,
         "--lr_warmup_steps",
         str(config.lr_warmup_steps),
-        "--max_train_steps",
-        str(config.max_train_steps),
         "--checkpointing_steps",
         str(config.checkpointing_steps),
         "--rank",
@@ -62,7 +60,7 @@ def build_lora_train_command(
         "--seed",
         str(config.seed),
         "--report_to",
-        "tensorboard",
+        config.report_to,
         "--output_dir",
         str(lora_output_dir),
         "--logging_dir",
@@ -70,7 +68,11 @@ def build_lora_train_command(
         "--mixed_precision",
         config.mixed_precision,
     ]
-    if enable_validation and config.validation_prompts:
+    if config.max_train_steps is not None:
+        command.extend(["--max_train_steps", str(config.max_train_steps)])
+    else:
+        command.extend(["--num_train_epochs", str(config.num_train_epochs)])
+    if enable_validation and config.enable_training_validation and config.validation_prompts:
         command.extend(
             [
                 "--validation_prompt",
@@ -107,6 +109,8 @@ def run_lora_training(
     env.setdefault("HF_HOME", str(settings.hf_home))
     env.setdefault("TRANSFORMERS_CACHE", str(settings.hf_home / "transformers"))
     env.setdefault("HF_DATASETS_CACHE", str(settings.hf_home / "datasets"))
+    env.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+    env.setdefault("ACCELERATE_USE_MPS_DEVICE", "true")
     if extra_env:
         env.update(extra_env)
 

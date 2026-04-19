@@ -20,9 +20,9 @@ class TrainingPaths:
         return cls(
             runtime_root=runtime_root,
             generation_dataset_root=runtime_root / "datasets" / "generation-v3",
-            scoring_dataset_root=runtime_root / "datasets" / "scoring-v3",
-            generation_training_root=runtime_root / "training" / "generation" / "sd15-electric-specialized",
-            scoring_training_root=runtime_root / "training" / "scoring" / "electric-score-v3",
+            scoring_dataset_root=runtime_root / "datasets" / "scoring-v2",
+            generation_training_root=runtime_root / "training" / "generation" / "sd15-electric-specialized-v2",
+            scoring_training_root=runtime_root / "training" / "scoring" / "electric-score-v2",
         )
 
     def ensure_directories(self) -> None:

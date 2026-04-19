@@ -21,6 +21,7 @@ func New(assetController *controller.AssetController) *gin.Engine {
 	assets := v1.Group("/assets")
 	assets.POST("/results", assetController.SaveGenerateResults)
 	assets.GET("/history", assetController.ListHistory)
+	assets.GET("/history/page", assetController.ListHistoryPage)
 	assets.GET("/history/:id", assetController.GetAssetDetail)
 
 	return engine

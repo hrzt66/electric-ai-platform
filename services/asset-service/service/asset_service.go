@@ -14,12 +14,15 @@ type SaveGenerateAssetInput = model.SaveGenerateAssetInput
 type SaveGenerateResultsInput = model.SaveGenerateResultsInput
 type PersistAssetResult = model.PersistAssetResult
 type HistoryItem = model.HistoryItem
+type HistoryPageQuery = model.HistoryPageQuery
+type HistoryPageResult = model.HistoryPageResult
 type AssetDetail = model.AssetDetail
 
 // Repository 定义资产服务依赖的持久化接口。
 type Repository interface {
 	SaveResults(ctx context.Context, jobID int64, items []PersistAssetResult) ([]HistoryItem, error)
 	ListHistory(ctx context.Context) ([]HistoryItem, error)
+	ListHistoryPage(ctx context.Context, query HistoryPageQuery) (HistoryPageResult, error)
 	GetDetail(ctx context.Context, id int64) (AssetDetail, error)
 }
 
@@ -54,10 +57,43 @@ func (s *AssetService) SaveGenerateResults(ctx context.Context, input SaveGenera
 			PhysicalPlausibility:  result.PhysicalPlausibility,
 			CompositionAesthetics: result.CompositionAesthetics,
 			TotalScore:            result.TotalScore,
+			CheckedImagePath:      result.CheckedImagePath,
+			ScoreExplanation:      result.ScoreExplanation,
 		})
 	}
 
-	return s.repo.SaveResults(ctx, input.JobID, items)
+	history, err := s.repo.ListHistory(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	existingByImageName := make(map[string]HistoryItem)
+	for _, item := range history {
+		if item.JobID != input.JobID {
+			continue
+		}
+		existingByImageName[item.ImageName] = item
+	}
+
+	pending := make([]PersistAssetResult, 0, len(items))
+	deduped := make([]HistoryItem, 0, len(items))
+	for _, item := range items {
+		if existing, ok := existingByImageName[item.ImageName]; ok {
+			deduped = append(deduped, existing)
+			continue
+		}
+		pending = append(pending, item)
+	}
+
+	if len(pending) == 0 {
+		return deduped, nil
+	}
+
+	saved, err := s.repo.SaveResults(ctx, input.JobID, pending)
+	if err != nil {
+		return nil, err
+	}
+	return append(deduped, saved...), nil
 }
 
 func (s *AssetService) ListHistory(ctx context.Context) ([]HistoryItem, error) {
@@ -74,4 +110,31 @@ func (s *AssetService) ListHistory(ctx context.Context) ([]HistoryItem, error) {
 
 func (s *AssetService) GetAssetDetail(ctx context.Context, id int64) (AssetDetail, error) {
 	return s.repo.GetDetail(ctx, id)
+}
+
+func (s *AssetService) ListHistoryPage(ctx context.Context, query HistoryPageQuery) (HistoryPageResult, error) {
+	normalized := normalizeHistoryPageQuery(query)
+	page, err := s.repo.ListHistoryPage(ctx, normalized)
+	if err != nil {
+		return HistoryPageResult{}, err
+	}
+	if page.Items == nil {
+		page.Items = []HistoryItem{}
+	}
+	page.Page = normalized.Page
+	page.PageSize = normalized.PageSize
+	return page, nil
+}
+
+func normalizeHistoryPageQuery(query HistoryPageQuery) HistoryPageQuery {
+	if query.Page <= 0 {
+		query.Page = 1
+	}
+	if query.PageSize <= 0 {
+		query.PageSize = 10
+	}
+	if query.PageSize > 100 {
+		query.PageSize = 100
+	}
+	return query
 }

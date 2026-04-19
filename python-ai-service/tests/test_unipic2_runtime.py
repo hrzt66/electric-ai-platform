@@ -130,6 +130,22 @@ def test_unipic2_runtime_can_disable_offload_for_cuda(tmp_path):
     assert pipeline.device == "cuda"
 
 
+def test_unipic2_runtime_moves_pipeline_to_mps_when_available(tmp_path):
+    from app.runtimes.unipic2_runtime import UniPic2Runtime
+
+    runtime = UniPic2Runtime(
+        model_dir=tmp_path / "unipic2-kontext",
+        output_dir=tmp_path / "outputs",
+        offload_mode="model",
+    )
+    pipeline = FakeAccelerationPipeline()
+
+    runtime._apply_execution_strategy(pipeline, device_type="mps")
+
+    assert pipeline.strategy is None
+    assert pipeline.device == "mps"
+
+
 def test_unipic2_runtime_logs_selected_execution_strategy(tmp_path, caplog):
     from app.runtimes.unipic2_runtime import UniPic2Runtime
 
@@ -274,6 +290,47 @@ def test_unipic2_runtime_uses_cuda_generator_without_offload(tmp_path, monkeypat
     assert generator.seed == 99
     assert manual_seed_calls == []
     assert manual_seed_all_calls == []
+
+
+def test_unipic2_runtime_uses_mps_generator(tmp_path, monkeypatch):
+    from app.runtimes.unipic2_runtime import UniPic2Runtime
+
+    created_devices: list[str] = []
+
+    class FakeGenerator:
+        def __init__(self, device: str) -> None:
+            self.device = device
+            self.seed: int | None = None
+
+        def manual_seed(self, seed: int):
+            self.seed = seed
+            return self
+
+    class FakeTorchModule:
+        class cuda:
+            @staticmethod
+            def is_available() -> bool:
+                return False
+
+        @staticmethod
+        def Generator(device: str):
+            created_devices.append(device)
+            return FakeGenerator(device)
+
+    monkeypatch.setattr("app.runtimes.unipic2_runtime.preferred_torch_device_type", lambda: "mps", raising=False)
+    monkeypatch.setitem(sys.modules, "torch", FakeTorchModule)
+
+    runtime = UniPic2Runtime(
+        model_dir=tmp_path / "unipic2-kontext",
+        output_dir=tmp_path / "outputs",
+        offload_mode="model",
+    )
+
+    generator = runtime._build_generator(77)
+
+    assert created_devices == ["mps"]
+    assert generator.device == "mps"
+    assert generator.seed == 77
 
 
 def test_unipic2_runtime_unload_runs_stronger_cuda_cleanup(tmp_path, monkeypatch):

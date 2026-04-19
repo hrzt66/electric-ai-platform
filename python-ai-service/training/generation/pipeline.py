@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 from dataclasses import asdict
@@ -13,6 +14,7 @@ from training.common.paths import TrainingPaths
 from training.generation.config import GenerationTrainingConfig
 from training.generation.evaluate import evaluate_generation_model
 from training.generation.merge_lora import merge_lora_weights
+from training.generation.prepare_dataset import prepare_generation_dataset
 from training.generation.train_lora import (
     build_lora_train_command,
     download_diffusers_lora_script,
@@ -24,6 +26,20 @@ def _load_manifest_rows(manifest_path: Path) -> list[dict]:
     if not manifest_path.exists():
         raise FileNotFoundError(f"generation manifest not found: {manifest_path}")
     return list(read_jsonl(manifest_path))
+
+
+def ensure_generation_dataset_ready(*, settings: Settings) -> dict[str, object]:
+    paths = TrainingPaths.from_settings(settings)
+    manifest_path = paths.generation_dataset_root / "manifests" / "raw_manifest.jsonl"
+    if manifest_path.exists() and any(read_jsonl(manifest_path)):
+        return {"manifest_path": str(manifest_path), "count": len(list(read_jsonl(manifest_path)))}
+    return prepare_generation_dataset(
+        settings=settings,
+        public_roots=[],
+        local_roots=[],
+        external_roots=[],
+        include_public_downloads=True,
+    )
 
 
 def _select_rows(rows: list[dict], max_samples: int | None) -> list[dict]:
@@ -58,6 +74,32 @@ def _export_curated_dataset(rows: list[dict], curated_root: Path) -> tuple[list[
     return metadata_rows, metadata_path
 
 
+def remove_obsolete_specialized_artifacts(settings: Settings) -> dict[str, object]:
+    targets = [
+        settings.runtime_root / "training" / "generation" / "sd15-electric-specialized",
+        settings.generation_model_dir / "sd15-electric-specialized",
+        settings.runtime_root / "generation" / "sd15-electric-specialized",
+    ]
+    removed_paths: list[str] = []
+    for target in targets:
+        if target.exists():
+            shutil.rmtree(target)
+            removed_paths.append(str(target))
+    return {"removed_paths": removed_paths}
+
+
+def select_best_generation_checkpoint(*, lora_output_dir: Path) -> Path:
+    candidates: list[tuple[int, Path]] = []
+    for path in lora_output_dir.glob("checkpoint-*"):
+        match = re.fullmatch(r"checkpoint-(\d+)", path.name)
+        if match and path.is_dir():
+            candidates.append((int(match.group(1)), path))
+    if not candidates:
+        return lora_output_dir
+    candidates.sort(key=lambda item: item[0])
+    return candidates[-1][1]
+
+
 def prepare_generation_training_workspace(
     *,
     settings: Settings | None = None,
@@ -71,6 +113,7 @@ def prepare_generation_training_workspace(
     paths = TrainingPaths.from_settings(runtime_settings)
     paths.ensure_directories()
 
+    ensure_generation_dataset_ready(settings=runtime_settings)
     manifest_path = paths.generation_dataset_root / "manifests" / "raw_manifest.jsonl"
     all_rows = _load_manifest_rows(manifest_path)
     selected_rows = _select_rows(all_rows, training_config.max_train_samples)
@@ -140,17 +183,24 @@ def run_generation_training(
         report["status"] = "prepared"
         return report
 
+    cleanup_report = remove_obsolete_specialized_artifacts(runtime_settings)
+    report["cleanup"] = cleanup_report
+
     run_lora_training(
         command=list(report["train_command"]),
         workdir=Path(report["lora_output_dir"]).parent,
         settings=runtime_settings,
     )
     report["status"] = "trained"
+    best_lora_checkpoint_dir = select_best_generation_checkpoint(
+        lora_output_dir=Path(report["lora_output_dir"]),
+    )
+    report["best_lora_checkpoint_dir"] = str(best_lora_checkpoint_dir)
 
     if not skip_merge:
         merged_model_dir = merge_lora_weights(
             base_model_name_or_path=training_config.resolve_base_model_source(runtime_settings),
-            lora_output_dir=Path(report["lora_output_dir"]),
+            lora_output_dir=best_lora_checkpoint_dir,
             merged_model_dir=Path(report["merged_model_dir"]),
         )
         report["merged_model_dir"] = str(merged_model_dir)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from app.runtimes.scorers.power_score_runtime import (
     DEFAULT_SCORING_MODEL_NAME,
@@ -60,9 +61,9 @@ class ScoringService:
             "total_score": total_score,
         }
 
-    def score_batch(self, job, images: list[dict]) -> list[dict]:
+    def score_batch(self, job, images: list[dict]) -> list[dict[str, Any]]:
         scoring_model_name = getattr(job, "scoring_model_name", DEFAULT_SCORING_MODEL_NAME) or DEFAULT_SCORING_MODEL_NAME
-        scored_items: list[dict] = []
+        scored_items: list[dict[str, Any]] = []
         for image in images:
             image_path = image["file_path"]
             scores = self._score_image(
@@ -88,7 +89,7 @@ class ScoringService:
             self.release_resources()
         return scored_items
 
-    def _score_image(self, *, image_path: str, prompt: str, scoring_model_name: str) -> dict[str, float]:
+    def _score_image(self, *, image_path: str, prompt: str, scoring_model_name: str) -> dict[str, Any]:
         if scoring_model_name in SELF_TRAINED_SCORING_MODEL_NAMES:
             if self._bundle_runtime is None:
                 raise RuntimeError("self-trained scoring runtime is not configured")

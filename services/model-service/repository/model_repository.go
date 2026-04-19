@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
@@ -60,6 +62,15 @@ INNER JOIN model_registry AS keeper
 	}
 }
 
+func runtimePath(parts ...string) string {
+	root := os.Getenv("ELECTRIC_AI_RUNTIME_ROOT")
+	if root == "" {
+		root = "model"
+	}
+	items := append([]string{root}, parts...)
+	return filepath.Join(items...)
+}
+
 // ensureSchema 确保模型表结构和基础种子数据存在。
 func (r *ModelRepository) ensureSchema(ctx context.Context) error {
 	r.schemaOnce.Do(func() {
@@ -83,7 +94,7 @@ func (r *ModelRepository) ensureSchema(ctx context.Context) error {
 				Description:           "SD1.5 baseline generation runtime for electric scenes",
 				DefaultPositivePrompt: "500kV substation, industrial realism, detailed power equipment",
 				DefaultNegativePrompt: "blurry, low quality, disconnected wires, deformed insulators",
-				LocalPath:             `G:\electric-ai-runtime\models\generation\sd15-electric`,
+				LocalPath:             runtimePath("generation", "sd15-electric"),
 			},
 			{
 				ModelName:             "sd15-electric-specialized",
@@ -94,7 +105,18 @@ func (r *ModelRepository) ensureSchema(ctx context.Context) error {
 				Description:           "Electric-domain specialized SD1.5 deployment model",
 				DefaultPositivePrompt: "500kV substation, realistic industrial equipment, clear wiring, detailed steel structures",
 				DefaultNegativePrompt: "cartoon, toy-like, disconnected wires, impossible geometry, blurry",
-				LocalPath:             `G:\electric-ai-runtime\models\generation\sd15-electric-specialized`,
+				LocalPath:             runtimePath("generation", "sd15-electric-specialized"),
+			},
+			{
+				ModelName:             "ssd1b-electric",
+				DisplayName:           "SSD-1B Electric",
+				ModelType:             "generation",
+				ServiceName:           "python-ai-service",
+				Status:                "available",
+				Description:           "SSD-1B SDXL distilled runtime tuned for lower-memory local generation",
+				DefaultPositivePrompt: "wind turbines on grassland, modern wind power station, tall white turbine, clear sky, sunlight, realistic, clean composition, high detail, cinematic lighting",
+				DefaultNegativePrompt: "blurry, low quality, artifact, deformed geometry",
+				LocalPath:             runtimePath("generation", "ssd1b-electric"),
 			},
 			{
 				ModelName:             "unipic2-kontext",
@@ -105,7 +127,7 @@ func (r *ModelRepository) ensureSchema(ctx context.Context) error {
 				Description:           "Advanced electric scene generation runtime",
 				DefaultPositivePrompt: "inspection robot, transformer yard, contextual electric environment",
 				DefaultNegativePrompt: "artifact, low detail, unrealistic scale",
-				LocalPath:             `G:\electric-ai-runtime\models\generation\unipic2-kontext`,
+				LocalPath:             runtimePath("generation", "unipic2-kontext"),
 			},
 			{
 				ModelName:             "electric-score-v1",
@@ -116,29 +138,18 @@ func (r *ModelRepository) ensureSchema(ctx context.Context) error {
 				Description:           "Legacy four-dimension scorer built from ImageReward, CLIP-IQA and aesthetic predictor",
 				DefaultPositivePrompt: "legacy electric scoring runtime",
 				DefaultNegativePrompt: "",
-				LocalPath:             `G:\electric-ai-runtime\models\scoring\electric-score-v1`,
+				LocalPath:             runtimePath("scoring", "electric-score-v1"),
 			},
 			{
 				ModelName:             "electric-score-v2",
-				DisplayName:           "Electric Score V2 (Self-Trained)",
+				DisplayName:           "Electric Score V2 (Electric Domain)",
 				ModelType:             "scoring",
 				ServiceName:           "python-ai-service",
 				Status:                "available",
-				Description:           "Self-trained lightweight four-dimension scorer for electric scenes",
-				DefaultPositivePrompt: "self-trained electric scoring runtime",
+				Description:           "Retrained lightweight four-dimension scorer for electric scenes",
+				DefaultPositivePrompt: "electric-domain scoring runtime",
 				DefaultNegativePrompt: "",
-				LocalPath:             `G:\electric-ai-runtime\models\scoring\electric-score-v2`,
-			},
-			{
-				ModelName:             "electric-score-v3",
-				DisplayName:           "Electric Score V3 (Human-Aligned)",
-				ModelType:             "scoring",
-				ServiceName:           "python-ai-service",
-				Status:                "available",
-				Description:           "Human-aligned four-dimension scorer with electric-domain constraints",
-				DefaultPositivePrompt: "human-aligned electric scoring runtime",
-				DefaultNegativePrompt: "",
-				LocalPath:             `G:\electric-ai-runtime\models\scoring\electric-score-v3`,
+				LocalPath:             runtimePath("scoring", "electric-score-v2"),
 			},
 			{
 				ModelName:             "image-reward",
@@ -149,7 +160,7 @@ func (r *ModelRepository) ensureSchema(ctx context.Context) error {
 				Description:           "Text-image alignment scoring runtime",
 				DefaultPositivePrompt: "alignment scorer",
 				DefaultNegativePrompt: "",
-				LocalPath:             `G:\electric-ai-runtime\models\scoring\image-reward`,
+				LocalPath:             runtimePath("scoring", "image-reward"),
 			},
 			{
 				ModelName:             "aesthetic-predictor",
@@ -160,7 +171,7 @@ func (r *ModelRepository) ensureSchema(ctx context.Context) error {
 				Description:           "Aesthetic and composition scoring runtime",
 				DefaultPositivePrompt: "aesthetic scorer",
 				DefaultNegativePrompt: "",
-				LocalPath:             `G:\electric-ai-runtime\models\scoring\aesthetic-predictor`,
+				LocalPath:             runtimePath("scoring", "aesthetic-predictor"),
 			},
 		}
 

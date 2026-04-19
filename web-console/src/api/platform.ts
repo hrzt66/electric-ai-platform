@@ -3,6 +3,8 @@ import { http } from './http'
 import type {
   ApiEnvelope,
   AssetDetail,
+  AssetHistoryPage,
+  AssetHistoryPageQuery,
   AssetHistoryItem,
   AuditEvent,
   GenerateTask,
@@ -46,6 +48,15 @@ export function listAssetHistory() {
   return unwrap<AssetHistoryItem[]>(http.get('/assets/history'))
 }
 
+// listAssetHistoryPage 拉取历史中心分页数据，并把筛选条件直接透传给后端。
+export function listAssetHistoryPage(params: AssetHistoryPageQuery) {
+  return unwrap<AssetHistoryPage>(
+    http.get('/assets/history/page', {
+      params,
+    }),
+  )
+}
+
 // getAssetDetail 查询单个资产的详细信息。
 export function getAssetDetail(assetId: number) {
   return unwrap<AssetDetail>(http.get(`/assets/history/${assetId}`))
@@ -64,5 +75,10 @@ export function listModels() {
 export function buildImageUrl(filePath: string) {
   // 资产服务当前通过网关静态文件入口暴露图片，只需要传最终文件名即可访问。
   const imageName = filePath.split(/[\\/]/).pop()
-  return imageName ? `/files/images/${encodeURIComponent(imageName)}` : ''
+  if (!imageName) {
+    return ''
+  }
+  const isCheckedImage = /(^|[\\/])image_check([\\/]|$)/.test(filePath)
+  const prefix = isCheckedImage ? '/files/image-checks/' : '/files/images/'
+  return `${prefix}${encodeURIComponent(imageName)}`
 }

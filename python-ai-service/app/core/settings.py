@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-DEFAULT_RUNTIME_ROOT = Path(r"G:\electric-ai-runtime")
+
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+DEFAULT_RUNTIME_ROOT = _project_root() / "model"
 DEFAULT_UNIPIC2_OFFLOAD_MODE = "model"
 
 
@@ -104,15 +109,19 @@ class Settings:
 
     @property
     def generation_model_dir(self) -> Path:
-        return self.runtime_root / "models" / "generation"
+        return self.runtime_root / "generation"
 
     @property
     def scoring_model_dir(self) -> Path:
-        return self.runtime_root / "models" / "scoring"
+        return self.runtime_root / "scoring"
 
     @property
     def output_image_dir(self) -> Path:
-        return self.runtime_root / "outputs" / "images"
+        return self.runtime_root / "image"
+
+    @property
+    def output_image_check_dir(self) -> Path:
+        return self.runtime_root / "image_check"
 
     @property
     def logs_dir(self) -> Path:

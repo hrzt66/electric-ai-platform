@@ -31,6 +31,18 @@ class BundleScorer:
             "physical_plausibility": 83.0,
             "composition_aesthetics": 84.0,
             "total_score": 82.5,
+            "checked_image_path": "model/image_check/job-3.png",
+            "score_explanation": {
+                "checked_image_path": "model/image_check/job-3.png",
+                "dimensions": {
+                    "text_consistency": {
+                        "uses_yolo": True,
+                        "summary": "matched objects",
+                        "formula": "demo",
+                        "details": ["matched"],
+                    }
+                },
+            },
         }
 
     def unload(self) -> None:
@@ -49,6 +61,18 @@ class RoutedBundleScorer:
             "physical_plausibility": 73.0,
             "composition_aesthetics": 74.0,
             "total_score": 72.5,
+            "checked_image_path": "model/image_check/job-3.png",
+            "score_explanation": {
+                "checked_image_path": "model/image_check/job-3.png",
+                "dimensions": {
+                    "total_score": {
+                        "uses_yolo": False,
+                        "summary": "weighted total",
+                        "formula": "weights",
+                        "details": ["demo"],
+                    }
+                },
+            },
         }
 
 
@@ -175,6 +199,8 @@ def test_scoring_service_uses_self_trained_bundle_runtime_when_requested(tmp_pat
 
     assert bundle_runtime.calls == [(str(image_path), "inspection robot in substation")]
     assert items[0]["total_score"] == 82.5
+    assert items[0]["checked_image_path"] == "model/image_check/job-3.png"
+    assert items[0]["score_explanation"]["checked_image_path"] == "model/image_check/job-3.png"
 
 
 def test_scoring_service_releases_bundle_runtime_after_batch_when_enabled(tmp_path):
@@ -197,24 +223,6 @@ def test_scoring_service_releases_bundle_runtime_after_batch_when_enabled(tmp_pa
     assert bundle_runtime.unloaded is True
 
 
-def test_scoring_service_uses_v3_bundle_runtime_when_requested(tmp_path):
-    from app.services.scoring_service import ScoringService
-
-    image_path = tmp_path / "job-3.png"
-    image_path.write_bytes(b"fake")
-
-    bundle_runtime = BundleScorer()
-    service = ScoringService(bundle_runtime=bundle_runtime)
-
-    items = service.score_batch(
-        job=build_job(scoring_model_name="electric-score-v3"),
-        images=[{"file_path": str(image_path), "seed": 101}],
-    )
-
-    assert bundle_runtime.calls == [(str(image_path), "inspection robot in substation")]
-    assert items[0]["total_score"] == 82.5
-
-
 def test_scoring_service_routes_bundle_by_scoring_model_name(tmp_path):
     from app.services.scoring_service import ScoringService
 
@@ -225,9 +233,10 @@ def test_scoring_service_routes_bundle_by_scoring_model_name(tmp_path):
     service = ScoringService(bundle_runtime=bundle_runtime)
 
     items = service.score_batch(
-        job=build_job(scoring_model_name="electric-score-v3"),
+        job=build_job(scoring_model_name="electric-score-v2"),
         images=[{"file_path": str(image_path), "seed": 101}],
     )
 
-    assert bundle_runtime.calls == [("electric-score-v3", str(image_path), "inspection robot in substation")]
+    assert bundle_runtime.calls == [("electric-score-v2", str(image_path), "inspection robot in substation")]
     assert items[0]["total_score"] == 72.5
+    assert items[0]["score_explanation"]["dimensions"]["total_score"]["summary"] == "weighted total"

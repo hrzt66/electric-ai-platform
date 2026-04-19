@@ -25,12 +25,13 @@ async function renderRadar(scores: ScoreSummary | null) {
 }
 
 describe('ScoreRadar', () => {
-  it('renders visible grade chips for the four score dimensions', async () => {
+  it('renders level chips for four dimensions and the total score without replacing numeric scores', async () => {
     const html = await renderRadar(createScores())
 
     expect(html).toContain('grade-chip')
-    expect(html).toContain('>A<')
-    expect(html).toContain('>C<')
-    expect(html).toContain('>D<')
+    expect(html).toContain('>优秀<')
+    expect(html).toContain('>达标<')
+    expect(html).toContain('>偏低<')
+    expect(html).toContain('51.27')
   })
 })

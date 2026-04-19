@@ -207,7 +207,7 @@ services:
       TASK_SERVICE_URL: http://task-service:8083
       ASSET_SERVICE_URL: http://asset-service:8084
       AUDIT_SERVICE_URL: http://audit-service:8085
-      IMAGE_OUTPUT_DIR: /runtime/outputs/images
+      IMAGE_OUTPUT_DIR: /runtime/image
     depends_on:
       auth-service:
         condition: service_started
@@ -220,7 +220,7 @@ services:
       audit-service:
         condition: service_started
     volumes:
-      - G:/electric-ai-runtime:/runtime
+      - ../model:/runtime
     ports:
       - "${GATEWAY_PORT:-18080}:8080"
 

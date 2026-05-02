@@ -92,3 +92,71 @@ def test_prepare_yolo_training_dataset_filters_and_remaps_active_classes(tmp_pat
         "0 0.500000 0.500000 0.250000 0.250000",
         "1 0.400000 0.400000 0.200000 0.200000",
     ]
+
+
+def test_prepare_yolo_training_dataset_remaps_legacy_component_labels_to_superclasses(tmp_path: Path) -> None:
+    from training.scoring.pipeline import _prepare_yolo_training_dataset
+
+    dataset_root = tmp_path / "source"
+    for split in ("train", "val", "test"):
+        (dataset_root / "images" / split).mkdir(parents=True, exist_ok=True)
+        (dataset_root / "labels" / split).mkdir(parents=True, exist_ok=True)
+        image_path = dataset_root / "images" / split / f"{split}.jpg"
+        label_path = dataset_root / "labels" / split / f"{split}.txt"
+        Image.new("RGB", (64, 64), color=(110, 120, 130)).save(image_path)
+        label_path.write_text(
+            "\n".join(
+                [
+                    "0 0.5 0.5 0.25 0.25",
+                    "1 0.4 0.4 0.2 0.2",
+                    "2 0.6 0.6 0.2 0.2",
+                    "3 0.7 0.7 0.15 0.15",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    dataset_yaml = dataset_root / "dataset.yaml"
+    dataset_yaml.write_text(
+        "\n".join(
+            [
+                f"path: {dataset_root}",
+                "train: images/train",
+                "val: images/val",
+                "test: images/test",
+                "names:",
+                "  - bus",
+                "  - tower",
+                "  - insulator",
+                "  - hardhat",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    merged_yaml = _prepare_yolo_training_dataset(
+        training_root=tmp_path / "training",
+        yolo_datasets=[str(dataset_yaml)],
+        active_classes=[
+            "substation_primary",
+            "transmission_tower",
+            "insulator_string",
+            "maintenance_ppe",
+        ],
+    )
+
+    merged_payload = yaml.safe_load(merged_yaml.read_text(encoding="utf-8"))
+    assert merged_payload["names"] == [
+        "substation_primary",
+        "transmission_tower",
+        "insulator_string",
+        "maintenance_ppe",
+    ]
+
+    label_text = (merged_yaml.parent / "labels" / "train" / "0_train.txt").read_text(encoding="utf-8").splitlines()
+    assert label_text == [
+        "0 0.500000 0.500000 0.250000 0.250000",
+        "1 0.400000 0.400000 0.200000 0.200000",
+        "2 0.600000 0.600000 0.200000 0.200000",
+        "3 0.700000 0.700000 0.150000 0.150000",
+    ]

@@ -7,6 +7,17 @@ from pathlib import Path
 from app.core.settings import Settings
 
 
+def test_public_generation_bucket_queries_cover_new_scene_categories() -> None:
+    from training.generation.public_dataset import ELECTRIC_BUCKET_QUERIES
+
+    assert "hydro" in ELECTRIC_BUCKET_QUERIES
+    assert "control_room" in ELECTRIC_BUCKET_QUERIES
+    assert "night_maintenance" in ELECTRIC_BUCKET_QUERIES
+    assert "hydroelectric dam" in ELECTRIC_BUCKET_QUERIES["hydro"]
+    assert "SCADA control room" in ELECTRIC_BUCKET_QUERIES["control_room"]
+    assert "power line maintenance at night" in ELECTRIC_BUCKET_QUERIES["night_maintenance"]
+
+
 def test_prepare_generation_dataset_writes_manifest(tmp_path: Path) -> None:
     from training.generation.prepare_dataset import prepare_generation_dataset
 

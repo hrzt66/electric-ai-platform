@@ -33,71 +33,74 @@ class ScoringTrainingConfig:
     max_test_samples: int | None = 256
     seed: int = 42
     yolo_model_name: str = "yolov8n.pt"
-    yolo_image_size: int = 384
+    yolo_image_size: int = 512
     yolo_epochs: int = 5
-    yolo_batch_size: int = 12
+    yolo_batch_size: int = 8
+    yolo_profile: str = "high_map"
+    yolo_train_variant: str = "high_map_v1"
+    yolo_optimizer: str = "AdamW"
+    yolo_learning_rate: float = 3e-4
+    yolo_weight_decay: float = 5e-4
+    yolo_warmup_epochs: float = 1.0
     yolo_confidence: float = 0.15
     yolo_iou: float = 0.45
-    yolo_validate_each_epoch: bool = False
+    yolo_validate_each_epoch: bool = True
     yolo_run_final_validation: bool = True
+    yolo_rect: bool = False
+    yolo_mosaic: float = 0.2
+    yolo_close_mosaic: int = 10
     yolo_min_train_instances: int = 50
     yolo_min_val_instances: int = 10
     targets: list[str] = field(default_factory=lambda: list(DEFAULT_TARGET_COLUMNS))
     total_weights: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_TOTAL_WEIGHTS))
     power_classes: list[str] = field(
         default_factory=lambda: [
-            "capacitor",
-            "bus",
-            "pipe",
-            "filter",
-            "gis",
-            "bushing",
-            "switch",
-            "line",
-            "pt",
-            "breaker",
-            "arrester",
-            "insulator",
-            "ct",
-            "tower",
-            "frame",
+            "substation_primary",
+            "transmission_tower",
+            "insulator_string",
+            "wind_turbine",
+            "solar_panel",
+            "dam",
+            "maintenance_ppe",
         ]
     )
-    dataset_sources: list[dict[str, str | bool]] = field(
+    dataset_sources: list[dict[str, object]] = field(
         default_factory=lambda: [
             {
-                "name": "substation-object-detection",
-                "url": "https://huggingface.co/datasets/sxiong/Power-equipment-image-dataset/resolve/main/substation%20object%20detection.zip?download=1",
-                "archive_name": "substation-object-detection.zip",
-                "kind": "detection",
-                "enabled": True,
-            },
-            {
-                "name": "transmission-line-classification",
-                "url": "https://huggingface.co/datasets/sxiong/Power-equipment-image-dataset/resolve/main/transmission%20line%20classification.zip?download=1",
-                "archive_name": "transmission-line-classification.zip",
-                "kind": "classification",
-                "enabled": True,
-            },
-            {
-                "name": "transmission-line-object-detection",
-                "url": "https://huggingface.co/datasets/sxiong/Power-equipment-image-dataset/resolve/main/transmission%20line%20object%20detection.zip?download=1",
-                "archive_name": "transmission-line-object-detection.zip",
-                "kind": "detection",
+                "name": "substation-object-detection-yolo",
+                "kind": "local_detection",
+                "dataset_root": "raw/extracted/substation-object-detection/substation-object-detection-yolo",
                 "enabled": True,
             },
             {
                 "name": "powerline-components-and-faults",
-                "dataset_id": "docmhvr/powerline-components-and-faults",
-                "kind": "hf_detection_bboxes_labels",
+                "kind": "local_detection",
+                "dataset_root": "raw/hf/powerline-components-and-faults",
                 "enabled": True,
-                "label_map": {
-                    "Broken Cable": "line",
-                    "Broken Insulator": "insulator",
-                    "Cable": "line",
-                    "Insulators": "insulator",
-                    "Tower": "tower",
-                },
+            },
+            {
+                "name": "dior-superclasses",
+                "kind": "local_detection",
+                "dataset_root": "raw/hf/dior-superclasses",
+                "enabled": True,
+            },
+            {
+                "name": "ppe-detection",
+                "kind": "local_detection",
+                "dataset_root": "raw/local/ppe-detection",
+                "enabled": True,
+            },
+            {
+                "name": "wind-turbine-aerial",
+                "kind": "local_detection",
+                "dataset_root": "raw/local/wind-turbine-aerial",
+                "enabled": True,
+            },
+            {
+                "name": "solar-plants-brazil-yolo",
+                "kind": "local_detection",
+                "dataset_root": "raw/local/solar-plants-brazil-yolo",
+                "enabled": True,
             },
         ]
     )
@@ -115,4 +118,6 @@ class ScoringTrainingConfig:
             "yolo_imgsz": self.yolo_image_size,
             "yolo_conf": self.yolo_confidence,
             "yolo_iou": self.yolo_iou,
+            "yolo_profile": self.yolo_profile,
+            "yolo_train_variant": self.yolo_train_variant,
         }

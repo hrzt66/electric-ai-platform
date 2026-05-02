@@ -304,7 +304,12 @@ def test_student_runtime_returns_structured_score_explanation_for_history_detail
     assert explanation["dimensions"]["physical_plausibility"]["uses_yolo"] is True
     assert explanation["dimensions"]["visual_fidelity"]["uses_yolo"] is False
     assert explanation["dimensions"]["text_consistency"]["matched_classes"] == ["tower"]
-    assert explanation["dimensions"]["text_consistency"]["missing_classes"] == ["insulator", "line"]
+    assert explanation["dimensions"]["text_consistency"]["missing_classes"] == [
+        "insulator",
+        "insulator_string",
+        "maintenance_ppe",
+        "transmission_tower",
+    ]
     assert explanation["dimensions"]["text_consistency"]["detections"][0]["class_name"] == "tower"
     assert "keyword_coverage" in explanation["dimensions"]["text_consistency"]["inputs"]
     assert "sharpness" in explanation["dimensions"]["visual_fidelity"]["inputs"]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import random
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -20,7 +21,9 @@ from training.scoring.datasets import (
     build_scoring_manifests,
     download_dataset_archives,
     extract_archives,
+    load_local_dataset_sources,
     materialize_hf_detection_datasets,
+    normalize_component_name,
     select_supported_power_classes,
 )
 from training.scoring.modeling import (
@@ -29,6 +32,7 @@ from training.scoring.modeling import (
     configure_image_backbone_trainability,
     encode_prompt,
 )
+from training.scoring.yolo_dataset_tools import build_high_map_variant
 
 
 class ScoreManifestDataset(Dataset):
@@ -103,14 +107,25 @@ def run_scoring_training(
         torch.cuda.manual_seed_all(training_config.seed)
 
     archives = download_dataset_archives(paths.scoring_dataset_root, training_config.dataset_sources)
-    extracted = extract_archives(paths.scoring_dataset_root, archives)
-    extracted.extend(
-        materialize_hf_detection_datasets(
-            dataset_root=paths.scoring_dataset_root,
-            sources=training_config.dataset_sources,
-            power_classes=training_config.power_classes,
-        )
+    archive_sources = extract_archives(paths.scoring_dataset_root, archives)
+    local_sources = load_local_dataset_sources(
+        dataset_root=paths.scoring_dataset_root,
+        sources=training_config.dataset_sources,
     )
+    hf_sources = materialize_hf_detection_datasets(
+        dataset_root=paths.scoring_dataset_root,
+        sources=training_config.dataset_sources,
+        power_classes=training_config.power_classes,
+    )
+    prepared_by_name = {
+        entry["name"]: entry
+        for entry in [*archive_sources, *local_sources, *hf_sources]
+    }
+    extracted = [
+        prepared_by_name[str(source["name"])]
+        for source in training_config.dataset_sources
+        if bool(source.get("enabled", True)) and str(source["name"]) in prepared_by_name
+    ]
     class_support = select_supported_power_classes(
         extracted=extracted,
         power_classes=training_config.power_classes,
@@ -334,23 +349,35 @@ def _train_yolo_auxiliary(
         yolo_datasets=[str(item) for item in manifest_summary["yolo_datasets"]],
         active_classes=active_classes,
     )
+    training_yaml = _maybe_build_high_map_training_dataset(
+        primary_yaml=primary_yaml,
+        training_root=training_root,
+        config=config,
+    )
     yolo_output_root = training_root / "yolo-aux"
     yolo_output_root.mkdir(parents=True, exist_ok=True)
+    run_name = f"electric-score-v2-{config.yolo_train_variant}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     try:
         model = YOLO(config.yolo_model_name)
         train_result = model.train(
-            data=str(primary_yaml),
+            data=str(training_yaml),
             epochs=config.yolo_epochs,
             imgsz=config.yolo_image_size,
             batch=config.yolo_batch_size,
             device=str(device),
             project=str(yolo_output_root),
-            name="electric-score-v2",
-            exist_ok=True,
+            name=run_name,
+            exist_ok=False,
+            optimizer=config.yolo_optimizer,
+            lr0=config.yolo_learning_rate,
+            weight_decay=config.yolo_weight_decay,
+            warmup_epochs=config.yolo_warmup_epochs,
             verbose=False,
             val=config.yolo_validate_each_epoch,
-            rect=True,
+            rect=config.yolo_rect,
+            mosaic=config.yolo_mosaic,
+            close_mosaic=config.yolo_close_mosaic,
             plots=False,
         )
         best_path = Path(train_result.save_dir) / "weights" / "best.pt"
@@ -359,18 +386,21 @@ def _train_yolo_auxiliary(
             report = {
                 "status": "trained",
                 "weights": str(bundle_dir / "yolo_aux.pt"),
-                "dataset": str(primary_yaml),
+                "dataset": str(training_yaml),
+                "profile": config.yolo_profile,
+                "dataset_variant": config.yolo_train_variant,
                 "dataset_count": len(manifest_summary["yolo_datasets"]),
+                "save_dir": str(train_result.save_dir),
             }
             if config.yolo_run_final_validation:
                 try:
                     validation = model.val(
-                        data=str(primary_yaml),
+                        data=str(training_yaml),
                         imgsz=config.yolo_image_size,
                         batch=config.yolo_batch_size,
                         device=str(device),
                         split="val",
-                        rect=True,
+                        rect=config.yolo_rect,
                         plots=False,
                         verbose=False,
                     )
@@ -383,6 +413,39 @@ def _train_yolo_auxiliary(
         return {"status": "missing-best-weight", "save_dir": str(train_result.save_dir)}
     except Exception as exc:  # pragma: no cover - runtime fallback
         return {"status": "failed", "error": str(exc)}
+
+
+def _maybe_build_high_map_training_dataset(
+    *,
+    primary_yaml: Path,
+    training_root: Path,
+    config: ScoringTrainingConfig,
+) -> Path:
+    if config.yolo_train_variant != "high_map_v1":
+        return primary_yaml
+
+    payload = yaml.safe_load(primary_yaml.read_text(encoding="utf-8")) or {}
+    dataset_root_raw = payload.get("path") or primary_yaml.parent
+    dataset_root = Path(dataset_root_raw)
+    if not dataset_root.is_absolute():
+        dataset_root = (primary_yaml.parent / dataset_root).resolve()
+    if not (dataset_root / "images").exists() or not (dataset_root / "labels").exists():
+        return primary_yaml
+
+    variant_root = training_root / "yolo-merged-high-map-v1"
+    variant_report = build_high_map_variant(
+        merged_root=dataset_root,
+        variant_root=variant_root,
+        max_repeat_by_class={
+            "substation_primary": 2,
+            "solar_panel": 3,
+            "dam": 2,
+            "maintenance_ppe": 3,
+        },
+        min_box_area=0.0004,
+        variant_name=config.yolo_train_variant,
+    )
+    return Path(str(variant_report["dataset_yaml"]))
 
 
 def _prepare_yolo_training_dataset(
@@ -414,9 +477,10 @@ def _prepare_yolo_training_dataset(
         if merged_names is None:
             merged_names = list(source_names)
         class_mapping = {
-            source_index: merged_names.index(class_name)
+            source_index: merged_names.index(normalized_name)
             for source_index, class_name in enumerate(source_names)
-            if class_name in merged_names
+            for normalized_name in [normalize_component_name(class_name, merged_names) or class_name]
+            if normalized_name in merged_names
         }
 
         for split in ("train", "val", "test"):

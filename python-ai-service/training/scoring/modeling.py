@@ -20,18 +20,33 @@ DEFAULT_TOTAL_WEIGHTS = {
     "composition_aesthetics": 0.18,
 }
 PROMPT_CLASS_ALIASES = {
-    "substation": {"bus", "frame", "breaker", "switch", "arrester", "insulator", "tower"},
-    "transformer": {"bushing", "frame", "switch"},
-    "breaker": {"breaker"},
-    "switch": {"switch"},
-    "arrester": {"arrester"},
-    "insulator": {"insulator"},
-    "line": {"line", "tower", "insulator"},
-    "transmission line": {"line", "tower", "insulator"},
-    "tower": {"tower", "line", "insulator"},
-    "busbar": {"bus"},
-    "capacitor": {"capacitor"},
-    "pipe": {"pipe"},
+    "substation": {"substation_primary", "bus", "bushing", "switch", "breaker", "arrester", "ct", "frame"},
+    "switchyard": {"substation_primary"},
+    "transformer": {"substation_primary", "bushing", "frame"},
+    "breaker": {"substation_primary", "breaker"},
+    "switch": {"substation_primary", "switch"},
+    "busbar": {"substation_primary", "bus"},
+    "capacitor": {"substation_primary", "capacitor"},
+    "pipe": {"substation_primary", "pipe"},
+    "transmission line": {"transmission_tower", "insulator_string", "tower", "insulator", "line"},
+    "transmission tower": {"transmission_tower", "tower"},
+    "tower": {"transmission_tower", "tower"},
+    "insulator": {"insulator_string", "insulator"},
+    "wind turbine": {"wind_turbine"},
+    "wind farm": {"wind_turbine"},
+    "photovoltaic": {"solar_panel"},
+    "solar panel": {"solar_panel"},
+    "solar farm": {"solar_panel"},
+    "dam": {"dam"},
+    "hydroelectric": {"dam"},
+    "maintenance": {"maintenance_ppe"},
+    "lineman": {"maintenance_ppe", "transmission_tower"},
+    "linemen": {"maintenance_ppe", "transmission_tower"},
+    "worker": {"maintenance_ppe"},
+    "ppe": {"maintenance_ppe"},
+    "helmet": {"maintenance_ppe"},
+    "hardhat": {"maintenance_ppe"},
+    "safety vest": {"maintenance_ppe"},
 }
 GENERIC_ELECTRIC_TERMS = {
     "electric",
@@ -48,8 +63,51 @@ GENERIC_ELECTRIC_TERMS = {
     "bus",
     "capacitor",
     "frame",
+    "transformer",
+    "switchyard",
+    "wind",
+    "turbine",
+    "solar",
+    "photovoltaic",
+    "hydro",
+    "dam",
+    "lineman",
+    "linemen",
+    "maintenance",
+    "ppe",
     "inspection",
 }
+
+
+def score_detected_topology(detected_classes: set[str]) -> float:
+    if not detected_classes:
+        return clamp_score(28.0)
+
+    topology = 35.0
+
+    if "substation_primary" in detected_classes or {"bus", "bushing"}.issubset(detected_classes):
+        topology += 18.0
+    if {"transmission_tower", "insulator_string"}.issubset(detected_classes) or {"tower", "insulator"}.issubset(detected_classes):
+        topology += 24.0
+    elif "transmission_tower" in detected_classes or "tower" in detected_classes:
+        topology += 10.0
+    elif "insulator_string" in detected_classes or "insulator" in detected_classes:
+        topology += 8.0
+    if "wind_turbine" in detected_classes:
+        topology += 18.0
+    if "solar_panel" in detected_classes:
+        topology += 16.0
+    if "dam" in detected_classes:
+        topology += 18.0
+    if "maintenance_ppe" in detected_classes:
+        topology += 12.0
+    if {"maintenance_ppe", "transmission_tower"}.issubset(detected_classes) or {"maintenance_ppe", "tower"}.issubset(detected_classes):
+        topology += 12.0
+    if {"tower", "line"}.issubset(detected_classes):
+        topology += 12.0
+
+    topology += min(10.0, len(detected_classes) * 2.0)
+    return clamp_score(topology)
 
 
 def choose_training_device(preferred: str | None = None) -> torch.device:

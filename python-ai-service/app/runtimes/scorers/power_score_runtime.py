@@ -20,6 +20,7 @@ from training.scoring.modeling import (
     choose_training_device,
     clamp_score,
     encode_prompt,
+    score_detected_topology,
 )
 
 DEFAULT_SCORING_MODEL_NAME = "electric-score-v1"
@@ -373,26 +374,7 @@ class PowerScoreRuntime:
             keyword_coverage = 50.0
 
         electric_presence = 35.0 + min(55.0, len(detected_classes) * 8.0)
-        topology = 35.0
-        if {"tower", "insulator"}.issubset(detected_classes):
-            topology += 16.0
-        if {"tower", "line"}.issubset(detected_classes):
-            topology += 24.0
-        if {"line", "insulator"}.issubset(detected_classes):
-            topology += 10.0
-        if {"bus", "bushing"}.issubset(detected_classes):
-            topology += 16.0
-        if {"bus", "switch"}.issubset(detected_classes):
-            topology += 12.0
-        if {"bus", "frame"}.issubset(detected_classes):
-            topology += 10.0
-        if {"ct", "bus"}.issubset(detected_classes):
-            topology += 10.0
-        if {"capacitor", "bus"}.issubset(detected_classes):
-            topology += 8.0
-        if {"frame", "bushing"}.issubset(detected_classes):
-            topology += 8.0
-        topology += min(10.0, len(detected_classes) * 2.0)
+        topology = score_detected_topology(detected_classes)
 
         return {
             "expected_classes": expected_classes,

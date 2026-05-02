@@ -50,17 +50,37 @@ def test_scoring_v2_defaults_target_100_epochs() -> None:
     from training.scoring.config import ScoringTrainingConfig
 
     config = ScoringTrainingConfig()
+    source_names = [str(source["name"]) for source in config.dataset_sources]
+    source_kinds = {str(source["name"]): str(source["kind"]) for source in config.dataset_sources}
 
     assert config.bundle_name == "electric-score-v2"
     assert config.epochs == 100
     assert config.device_preference == "mps"
     assert config.yolo_model_name == "yolov8n.pt"
-    assert config.yolo_image_size == 384
-    assert config.yolo_batch_size == 12
-    assert config.yolo_validate_each_epoch is False
+    assert config.yolo_image_size == 512
+    assert config.yolo_batch_size == 8
+    assert config.yolo_profile == "high_map"
+    assert config.yolo_train_variant == "high_map_v1"
+    assert config.yolo_optimizer == "AdamW"
+    assert config.yolo_learning_rate == 3e-4
+    assert config.yolo_weight_decay == 5e-4
+    assert config.yolo_warmup_epochs == 1.0
+    assert config.yolo_validate_each_epoch is True
     assert config.yolo_run_final_validation is True
+    assert config.yolo_rect is False
+    assert config.yolo_mosaic == 0.2
+    assert config.yolo_close_mosaic == 10
     assert config.yolo_min_train_instances == 50
     assert config.yolo_min_val_instances == 10
+    assert config.power_classes == [
+        "substation_primary",
+        "transmission_tower",
+        "insulator_string",
+        "wind_turbine",
+        "solar_panel",
+        "dam",
+        "maintenance_ppe",
+    ]
     assert config.total_weights["text_consistency"] == 0.37
     assert config.score_calibration["visual_fidelity"] == {"target": 64.0, "gain": 0.5}
     assert config.score_calibration["composition_aesthetics"] == {"target": 76.0, "gain": 0.4}
@@ -69,10 +89,40 @@ def test_scoring_v2_defaults_target_100_epochs() -> None:
     assert config.max_train_samples == 1536
     assert config.max_val_samples == 256
     assert config.max_test_samples == 256
-    assert any(source["name"] == "powerline-components-and-faults" for source in config.dataset_sources)
-    transmission_detection = next(source for source in config.dataset_sources if source["name"] == "transmission-line-object-detection")
-    assert transmission_detection["enabled"] is True
+    assert source_names == [
+        "substation-object-detection-yolo",
+        "powerline-components-and-faults",
+        "dior-superclasses",
+        "ppe-detection",
+        "wind-turbine-aerial",
+        "solar-plants-brazil-yolo",
+    ]
+    assert source_kinds["substation-object-detection-yolo"] == "local_detection"
+    assert source_kinds["powerline-components-and-faults"] == "local_detection"
+    assert source_kinds["dior-superclasses"] == "local_detection"
+    assert source_kinds["ppe-detection"] == "local_detection"
+    assert source_kinds["wind-turbine-aerial"] == "local_detection"
+    assert source_kinds["solar-plants-brazil-yolo"] == "local_detection"
     assert "score_bands" not in config.bundle_payload()
+    assert config.bundle_payload()["yolo_profile"] == "high_map"
+    assert config.bundle_payload()["yolo_train_variant"] == "high_map_v1"
+
+
+def test_scoring_v2_exposes_high_map_yolo_profile() -> None:
+    from training.scoring.config import ScoringTrainingConfig
+
+    config = ScoringTrainingConfig()
+
+    assert config.yolo_profile == "high_map"
+    assert config.yolo_train_variant == "high_map_v1"
+    assert config.yolo_optimizer == "AdamW"
+    assert config.yolo_learning_rate == 3e-4
+    assert config.yolo_weight_decay == 5e-4
+    assert config.yolo_warmup_epochs == 1.0
+    assert config.yolo_validate_each_epoch is True
+    assert config.yolo_rect is False
+    assert config.yolo_mosaic == 0.2
+    assert config.yolo_close_mosaic == 10
 
 
 def test_scoring_v2_only_unfreezes_the_tail_backbone_stages() -> None:
@@ -153,7 +203,7 @@ def test_scoring_v2_pipeline_builds_student_bundle(monkeypatch, tmp_path) -> Non
     assert metrics["test_metrics"]["mae"] >= 0.0
 
 
-def test_scoring_v2_yolo_training_prefers_local_friendly_train_and_final_val(monkeypatch, tmp_path: Path) -> None:
+def test_scoring_v2_yolo_training_uses_explicit_high_map_profile(monkeypatch, tmp_path: Path) -> None:
     from training.scoring import pipeline as pipeline_module
     from training.scoring.config import ScoringTrainingConfig
 
@@ -198,10 +248,16 @@ def test_scoring_v2_yolo_training_prefers_local_friendly_train_and_final_val(mon
     train_kwargs = recorded["train"]
     val_kwargs = recorded["val"]
 
-    assert train_kwargs["imgsz"] == 384
-    assert train_kwargs["batch"] == 12
-    assert train_kwargs["val"] is False
-    assert train_kwargs["rect"] is True
+    assert train_kwargs["imgsz"] == 512
+    assert train_kwargs["batch"] == 8
+    assert train_kwargs["optimizer"] == "AdamW"
+    assert train_kwargs["lr0"] == 3e-4
+    assert train_kwargs["weight_decay"] == 5e-4
+    assert train_kwargs["warmup_epochs"] == 1.0
+    assert train_kwargs["val"] is True
+    assert train_kwargs["rect"] is False
+    assert train_kwargs["mosaic"] == 0.2
+    assert train_kwargs["close_mosaic"] == 10
     assert train_kwargs["plots"] is False
     assert val_kwargs["split"] == "val"
     assert report["validation"]["metrics/mAP50(B)"] == 0.25

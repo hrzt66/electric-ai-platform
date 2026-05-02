@@ -19,40 +19,69 @@ from training.scoring.modeling import (
     GENERIC_ELECTRIC_TERMS,
     PROMPT_CLASS_ALIASES,
     clamp_score,
+    score_detected_topology,
 )
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 CLASS_COMPONENT_ALIASES = {
-    "busbar": "bus",
-    "connecting port": "bus",
-    "conductor": "line",
-    "wire": "line",
-    "dx": "line",
-    "tower": "tower",
-    "frame": "frame",
-    "insulator": "insulator",
-    "arrester": "arrester",
-    "breaker": "breaker",
-    "switch": "switch",
-    "pipe": "pipe",
-    "bushing": "bushing",
-    "filter": "filter",
-    "capacitor": "capacitor",
-    "gis": "gis",
-    "pt": "pt",
-    "ct": "ct",
+    "substation": "substation_primary",
+    "transformer": "substation_primary",
+    "transformers": "substation_primary",
+    "bus": "substation_primary",
+    "busbar": "substation_primary",
+    "connecting port": "substation_primary",
+    "bushing": "substation_primary",
+    "breaker": "substation_primary",
+    "switch": "substation_primary",
+    "arrester": "substation_primary",
+    "capacitor": "substation_primary",
+    "filter": "substation_primary",
+    "pipe": "substation_primary",
+    "gis": "substation_primary",
+    "pt": "substation_primary",
+    "ct": "substation_primary",
+    "frame": "substation_primary",
+    "tower": "transmission_tower",
+    "pylon": "transmission_tower",
+    "pole": "transmission_tower",
+    "insulator": "insulator_string",
+    "insulators": "insulator_string",
+    "wind_turbine": "wind_turbine",
+    "wind turbine": "wind_turbine",
+    "windmill": "wind_turbine",
+    "solar_panel": "solar_panel",
+    "solar panel": "solar_panel",
+    "pv": "solar_panel",
+    "photovoltaic": "solar_panel",
+    "dam": "dam",
+    "check dam": "dam",
+    "hydroelectric dam": "dam",
+    "person": "maintenance_ppe",
+    "worker": "maintenance_ppe",
+    "hardhat": "maintenance_ppe",
+    "helmet": "maintenance_ppe",
+    "vest": "maintenance_ppe",
+    "glove": "maintenance_ppe",
+    "gloves": "maintenance_ppe",
+    "boot": "maintenance_ppe",
+    "boots": "maintenance_ppe",
+    "no_hardhat": "maintenance_ppe",
+    "no vest": "maintenance_ppe",
+    "no_vest": "maintenance_ppe",
+    "no_gloves": "maintenance_ppe",
+    "no_boots": "maintenance_ppe",
 }
 CLASSIFICATION_COMPONENT_PREFIX = {
-    "blq": "arrester",
-    "czjyz": "insulator",
-    "dx": "line",
-    "fhjyz": "insulator",
-    "gydxjd": "line",
-    "jj": "line",
-    "jyspbg": "insulator",
-    "nw": "line",
-    "yw": "line",
-    "yxdk": "line",
+    "blq": "substation_primary",
+    "czjyz": "insulator_string",
+    "dx": "transmission_tower",
+    "fhjyz": "insulator_string",
+    "gydxjd": "transmission_tower",
+    "jj": "transmission_tower",
+    "jyspbg": "insulator_string",
+    "nw": "transmission_tower",
+    "yw": "transmission_tower",
+    "yxdk": "transmission_tower",
 }
 
 
@@ -104,6 +133,36 @@ def extract_archives(dataset_root: Path, archives: list[dict[str, str]]) -> list
     return extracted
 
 
+def load_local_dataset_sources(
+    *,
+    dataset_root: Path,
+    sources: list[dict[str, object]],
+) -> list[dict[str, str]]:
+    extracted: list[dict[str, str]] = []
+    for source in sources:
+        if not bool(source.get("enabled", True)):
+            continue
+        kind = str(source.get("kind", ""))
+        if kind not in {"local_detection", "local_classification"}:
+            continue
+        source_root_raw = source.get("dataset_root")
+        if not isinstance(source_root_raw, str) or not source_root_raw.strip():
+            continue
+        source_root = Path(source_root_raw)
+        if not source_root.is_absolute():
+            source_root = (dataset_root / source_root).resolve()
+        if not source_root.exists():
+            continue
+        extracted.append(
+            {
+                "name": str(source["name"]),
+                "kind": "detection" if kind == "local_detection" else "classification",
+                "root": str(source_root),
+            }
+        )
+    return extracted
+
+
 def materialize_hf_detection_datasets(
     *,
     dataset_root: Path,
@@ -124,7 +183,7 @@ def materialize_hf_detection_datasets(
         source_name = str(source["name"])
         export_root = materialized_root / source_name
         stamp = export_root / ".materialize-complete"
-        if not stamp.exists():
+        if not stamp.exists() or not _materialized_dataset_matches_classes(export_root, power_classes):
             if export_root.exists():
                 shutil.rmtree(export_root)
             export_root.mkdir(parents=True, exist_ok=True)
@@ -510,6 +569,13 @@ def _load_class_names(yolo_yaml: Path) -> list[str]:
     return [str(item) for item in names]
 
 
+def _materialized_dataset_matches_classes(export_root: Path, power_classes: list[str]) -> bool:
+    dataset_yaml = export_root / "dataset.yaml"
+    if not dataset_yaml.exists():
+        return False
+    return _load_class_names(dataset_yaml) == [str(item) for item in power_classes]
+
+
 def _find_image_for_label(label_path: Path) -> Path | None:
     stem = label_path.stem
     candidates: list[Path] = []
@@ -642,6 +708,10 @@ def _polygon_to_bbox(shape_attributes: dict[str, object]) -> list[float] | None:
     ]
 
 
+def normalize_component_name(raw_name: str, power_classes: list[str]) -> str | None:
+    return _normalize_component(raw_name, power_classes)
+
+
 def _normalize_component(raw_name: str, power_classes: list[str]) -> str | None:
     lower = raw_name.lower().replace("-", " ").replace("_", " ")
     tokens = [lower, *lower.split()]
@@ -650,7 +720,7 @@ def _normalize_component(raw_name: str, power_classes: list[str]) -> str | None:
         if alias in power_classes:
             return alias
     for candidate in power_classes:
-        if candidate in lower:
+        if candidate in lower or candidate.replace("_", " ") in lower:
             return candidate
     return None
 
@@ -677,7 +747,7 @@ def _xyxy_to_yolo_bbox(bbox: list[float], *, image_width: int, image_height: int
 
 def _map_classification_component(class_name: str) -> str:
     prefix = class_name.split("_", 1)[0]
-    return CLASSIFICATION_COMPONENT_PREFIX.get(prefix, "line")
+    return CLASSIFICATION_COMPONENT_PREFIX.get(prefix, "transmission_tower")
 
 
 def _build_prompt_from_detections(detections: list[dict[str, object]]) -> str:
@@ -825,16 +895,7 @@ def _analyze_prompt(*, prompt: str, detections: list[dict[str, object]]) -> dict
         keyword_coverage = 50.0
 
     electric_presence = 35.0 + min(55.0, len(detected_classes) * 8.0)
-    topology = 35.0
-    if {"tower", "line"}.issubset(detected_classes):
-        topology += 24.0
-    if {"tower", "insulator"}.issubset(detected_classes):
-        topology += 14.0
-    if {"breaker", "bus"}.issubset(detected_classes):
-        topology += 16.0
-    if {"frame", "switch"}.issubset(detected_classes):
-        topology += 12.0
-    topology += min(12.0, len(detected_classes) * 2.0)
+    topology = score_detected_topology(detected_classes)
 
     return {
         "expected_classes": sorted(expected_classes),

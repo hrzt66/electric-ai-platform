@@ -47,6 +47,21 @@ ELECTRIC_BUCKET_QUERIES = {
         "solar farm",
         "photovoltaic inverter station",
     ],
+    "hydro": [
+        "hydroelectric dam",
+        "hydropower station",
+        "dam spillway",
+    ],
+    "control_room": [
+        "grid control room",
+        "SCADA control room",
+        "power dispatch center",
+    ],
+    "night_maintenance": [
+        "utility lineworker at night",
+        "power line maintenance at night",
+        "bucket truck utility worker",
+    ],
     "inspection": [
         "power equipment inspection",
         "industrial utility maintenance",

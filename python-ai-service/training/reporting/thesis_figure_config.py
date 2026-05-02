@@ -23,6 +23,7 @@ FIXED_NEGATIVE_PROMPT = (
 
 GENERATION_MODELS = ["sd15-electric", "sd15-electric-specialized", "ssd1b-electric"]
 SCORING_MODELS = ["electric-score-v1", "electric-score-v2"]
+MODEL_COMPARE_HEATMAP_MODELS = ["sd15-electric", "sd15-electric-specialized"]
 
 MODEL_COLORS = {
     "sd15-electric": "#1f4e79",
@@ -91,8 +92,9 @@ def expected_figure_inventory() -> list[FigureSpec]:
         FigureSpec("24_total_score_boxplot.png", "总分箱线图", "实验结果对比", "docs/image"),
         FigureSpec("25_multidim_score_heatmap_v1.png", "多维度评分热力图（基线评分器）", "实验结果对比", "docs/image"),
         FigureSpec("26_multidim_score_heatmap_v2.png", "多维度评分热力图（自训练评分器）", "实验结果对比", "docs/image"),
-        FigureSpec("27_prompt_win_count_compare.png", "固定 Prompt 集获胜次数统计图", "实验结果对比", "docs/image"),
-        FigureSpec("28_generation_time_compare.png", "生成耗时对比图", "实验结果对比", "docs/image"),
+        FigureSpec("27_multidim_score_heatmap_model_compare.png", "多维度评分热力图（SD1.5 基础版 vs 电力专精版，V1/V2 对照）", "实验结果对比", "docs/image"),
+        FigureSpec("28_prompt_win_count_compare.png", "固定 Prompt 集获胜次数统计图", "实验结果对比", "docs/image"),
+        FigureSpec("29_generation_time_compare.png", "生成耗时对比图", "实验结果对比", "docs/image"),
     ]
     return [
         FigureSpec("01_generation_prompt_overview_grid.png", "固定 Prompt 集生成结果总览", "生成结果对比", "docs/image"),

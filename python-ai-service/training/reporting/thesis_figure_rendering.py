@@ -20,6 +20,7 @@ from app.core.settings import Settings
 from app.dependencies import build_runtime_registry, build_scoring_service
 from training.reporting.thesis_figure_config import (
     FigureSpec,
+    MODEL_COMPARE_HEATMAP_MODELS,
     MODEL_COLORS,
     build_prompt_suite,
     expected_figure_inventory,
@@ -269,6 +270,39 @@ def _plot_heatmap(
     _save_figure(fig, output_dirs, filename)
 
 
+def _plot_heatmap_pair(
+    *,
+    left_matrix: np.ndarray,
+    right_matrix: np.ndarray,
+    row_labels: list[str],
+    col_labels: list[str],
+    left_title: str,
+    right_title: str,
+    title: str,
+    output_dirs: dict[str, Path],
+    filename: str,
+) -> None:
+    vmin = min(float(np.min(left_matrix)), float(np.min(right_matrix)))
+    vmax = max(float(np.max(left_matrix)), float(np.max(right_matrix)))
+    fig, axes = plt.subplots(1, 2, figsize=(22, 6), sharey=True)
+    heatmaps = []
+    for axis, matrix, subplot_title in (
+        (axes[0], left_matrix, left_title),
+        (axes[1], right_matrix, right_title),
+    ):
+        heatmap = axis.imshow(matrix, aspect="auto", cmap="YlOrRd", vmin=vmin, vmax=vmax)
+        heatmaps.append(heatmap)
+        axis.set_xticks(np.arange(len(col_labels)))
+        axis.set_xticklabels(col_labels, rotation=45, ha="right")
+        axis.set_yticks(np.arange(len(row_labels)))
+        axis.set_yticklabels(row_labels)
+        axis.set_title(subplot_title, fontsize=13, fontweight="bold")
+    fig.suptitle(title, fontsize=15, fontweight="bold")
+    fig.colorbar(heatmaps[-1], ax=axes, fraction=0.025, pad=0.02)
+    fig.subplots_adjust(left=0.05, right=0.92, bottom=0.25, top=0.84, wspace=0.08)
+    _save_figure(fig, output_dirs, filename)
+
+
 def _plot_scoring_pipeline_figure(output_dirs: dict[str, Path], filename: str) -> None:
     fig, ax = plt.subplots(figsize=(12, 5))
     ax.axis("off")
@@ -390,14 +424,26 @@ def _build_generation_records(runtime_root: Path, output_root: Path) -> list[dic
 
 
 def _build_heatmap_matrix(records: list[dict[str, object]], scoring_model_name: str) -> tuple[np.ndarray, list[str], list[str]]:
+    return _build_model_compare_heatmap_matrix(
+        records,
+        scoring_model_name=scoring_model_name,
+        model_names=build_prompt_suite().generation_models,
+    )
+
+
+def _build_model_compare_heatmap_matrix(
+    records: list[dict[str, object]],
+    scoring_model_name: str,
+    model_names: list[str],
+) -> tuple[np.ndarray, list[str], list[str]]:
     suite = build_prompt_suite()
     metrics = ["visual_fidelity", "text_consistency", "physical_plausibility", "composition_aesthetics", "total_score"]
     rows: list[list[float]] = []
     row_labels = [f"P{index:02d}" for index in range(1, len(suite.prompts) + 1)]
-    col_labels = [f"{model_name}-{metric}" for model_name in suite.generation_models for metric in metrics]
+    col_labels = [f"{model_name}-{metric}" for model_name in model_names for metric in metrics]
     for prompt_index in range(1, len(suite.prompts) + 1):
         row_values: list[float] = []
-        for model_name in suite.generation_models:
+        for model_name in model_names:
             record = next(item for item in records if item["prompt_index"] == prompt_index and item["model_name"] == model_name)
             score_bundle = record["scores"][scoring_model_name]
             row_values.extend(float(score_bundle[metric]) for metric in metrics)
@@ -650,6 +696,27 @@ def _render_evaluation_stats(records: list[dict[str, object]], output_dirs: dict
         output_dirs=output_dirs,
         filename="26_multidim_score_heatmap_v2.png",
     )
+    model_compare_heatmap_v1, row_labels, col_labels = _build_model_compare_heatmap_matrix(
+        records,
+        scoring_model_name="electric-score-v1",
+        model_names=list(MODEL_COMPARE_HEATMAP_MODELS),
+    )
+    model_compare_heatmap_v2, row_labels, col_labels = _build_model_compare_heatmap_matrix(
+        records,
+        scoring_model_name="electric-score-v2",
+        model_names=list(MODEL_COMPARE_HEATMAP_MODELS),
+    )
+    _plot_heatmap_pair(
+        left_matrix=model_compare_heatmap_v1,
+        right_matrix=model_compare_heatmap_v2,
+        row_labels=row_labels,
+        col_labels=col_labels,
+        left_title="基线评分器 electric-score-v1",
+        right_title="自训练评分器 electric-score-v2",
+        title="多维度评分热力图（SD1.5 基础版 vs 电力专精版，V1/V2 对照）",
+        output_dirs=output_dirs,
+        filename="27_multidim_score_heatmap_model_compare.png",
+    )
 
     win_counts = {scoring_model: {model_name: 0 for model_name in suite.generation_models} for scoring_model in suite.scoring_models}
     for prompt_index in range(1, len(suite.prompts) + 1):
@@ -666,7 +733,7 @@ def _render_evaluation_stats(records: list[dict[str, object]], output_dirs: dict
         title="固定 Prompt 集获胜次数统计图",
         ylabel="获胜次数",
         output_dirs=output_dirs,
-        filename="27_prompt_win_count_compare.png",
+        filename="28_prompt_win_count_compare.png",
     )
 
     avg_generation_time = [
@@ -679,7 +746,7 @@ def _render_evaluation_stats(records: list[dict[str, object]], output_dirs: dict
         title="生成耗时对比图",
         ylabel="平均耗时（秒）",
         output_dirs=output_dirs,
-        filename="28_generation_time_compare.png",
+        filename="29_generation_time_compare.png",
     )
 
 

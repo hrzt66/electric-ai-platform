@@ -156,13 +156,19 @@
     "source": "docs/image"
   },
   {
-    "filename": "27_prompt_win_count_compare.png",
+    "filename": "27_multidim_score_heatmap_model_compare.png",
+    "title": "多维度评分热力图（SD1.5 基础版 vs 电力专精版，V1/V2 对照）",
+    "section": "实验结果对比",
+    "source": "docs/image"
+  },
+  {
+    "filename": "28_prompt_win_count_compare.png",
     "title": "固定 Prompt 集获胜次数统计图",
     "section": "实验结果对比",
     "source": "docs/image"
   },
   {
-    "filename": "28_generation_time_compare.png",
+    "filename": "29_generation_time_compare.png",
     "title": "生成耗时对比图",
     "section": "实验结果对比",
     "source": "docs/image"

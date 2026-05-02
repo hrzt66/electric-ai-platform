@@ -80,3 +80,60 @@ func TestImageCheckFilesAreServedWithoutAuthentication(t *testing.T) {
 		t.Fatalf("unexpected body: %s", rec.Body.String())
 	}
 }
+
+func TestAllowedOriginGetsCorsHeaders(t *testing.T) {
+	engine := New(Upstreams{
+		Auth:  service.NewReverseProxy("http://example.com"),
+		Model: service.NewReverseProxy("http://example.com"),
+		Task:  service.NewReverseProxy("http://example.com"),
+		Asset: service.NewReverseProxy("http://example.com"),
+		Audit: service.NewReverseProxy("http://example.com"),
+		Files: http.NotFoundHandler(),
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Origin", "https://www.camartshub.xyz")
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://www.camartshub.xyz" {
+		t.Fatalf("expected allowed origin header, got %q", got)
+	}
+	if got := rec.Header().Get("Vary"); got == "" {
+		t.Fatalf("expected Vary header to be set")
+	}
+}
+
+func TestAllowedOriginPreflightBypassesAuth(t *testing.T) {
+	engine := New(Upstreams{
+		Auth:  service.NewReverseProxy("http://example.com"),
+		Model: service.NewReverseProxy("http://example.com"),
+		Task:  service.NewReverseProxy("http://example.com"),
+		Asset: service.NewReverseProxy("http://example.com"),
+		Audit: service.NewReverseProxy("http://example.com"),
+		Files: http.NotFoundHandler(),
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/tasks", nil)
+	req.Header.Set("Origin", "https://electric-ai-platform-web-console.vercel.app")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "Authorization, Content-Type")
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://electric-ai-platform-web-console.vercel.app" {
+		t.Fatalf("expected vercel origin to be allowed, got %q", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Methods"); got == "" {
+		t.Fatalf("expected allow methods header")
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Headers"); got == "" {
+		t.Fatalf("expected allow headers header")
+	}
+}

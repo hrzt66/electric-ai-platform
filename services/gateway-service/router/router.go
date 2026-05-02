@@ -21,6 +21,7 @@ type Upstreams struct {
 
 func New(upstreams Upstreams) *gin.Engine {
 	r := gin.Default()
+	r.Use(middleware.CORS())
 	r.GET("/health", func(ctx *gin.Context) { ctx.JSON(200, gin.H{"status": "ok"}) })
 
 	r.Any("/api/v1/auth/*path", gin.WrapH(upstreams.Auth))

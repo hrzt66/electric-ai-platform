@@ -130,6 +130,17 @@ func (r *ModelRepository) ensureSchema(ctx context.Context) error {
 				LocalPath:             runtimePath("generation", "unipic2-kontext"),
 			},
 			{
+				ModelName:             "gpt-image-2",
+				DisplayName:           "GPT Image 2",
+				ModelType:             "generation",
+				ServiceName:           "python-ai-service",
+				Status:                "available",
+				Description:           "OpenAI-compatible Image 2 API generation runtime",
+				DefaultPositivePrompt: "500kV substation, industrial realism, detailed power equipment, high quality",
+				DefaultNegativePrompt: "blurry, low quality, artifact, deformed geometry",
+				LocalPath:             "api/openai/gpt-image-2",
+			},
+			{
 				ModelName:             "electric-score-v1",
 				DisplayName:           "Electric Score V1 (Legacy)",
 				ModelType:             "scoring",

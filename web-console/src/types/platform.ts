@@ -59,6 +59,7 @@ export type ScoreExplanationDimension = {
   score?: number
   grade_label?: string
   uses_yolo: boolean
+  uses_gpt?: boolean
   summary: string
   formula: string
   details: string[]
@@ -137,6 +138,70 @@ export type AuditEvent = {
   message: string
   payload_json: string
   created_at: string
+}
+
+export type MonitorHealthLevel = 'healthy' | 'warning' | 'critical'
+
+export type MonitorAlert = {
+  alert_id: string
+  level: MonitorHealthLevel
+  title?: string
+  message?: string
+}
+
+export type HostSnapshot = {
+  platform_family: 'windows' | 'macos' | 'unknown'
+  cpu_usage_percent: number
+  memory_total_bytes?: number
+  memory_used_bytes?: number
+  memory_available_bytes?: number
+  memory_pressure_level?: string
+  swap_used_bytes?: number
+  swap_total_bytes?: number
+  disk_total_bytes?: number
+  disk_used_bytes?: number
+  disk_available_bytes?: number
+}
+
+export type AcceleratorSnapshot = {
+  accelerator_type: 'nvidia-cuda' | 'apple-mps' | 'unavailable'
+  summary_label: string
+  available?: boolean
+  gpu_name?: string
+  vram_total_mb?: number
+  vram_used_mb?: number
+  gpu_utilization_percent?: number
+  temperature_c?: number
+  mps_available?: boolean
+  unified_memory_pressure?: string
+  ai_process_memory_bytes?: number
+  unavailable_reason?: string
+}
+
+export type ServiceSnapshot = {
+  service_name: string
+  status: string
+  resident_memory_bytes?: number
+}
+
+export type TaskRuntimeContext = {
+  active_task_count: number
+  latest_task_stage?: string
+}
+
+export type MonitorOverview = {
+  overall_health: MonitorHealthLevel
+  host_snapshot: HostSnapshot
+  accelerator_snapshot?: AcceleratorSnapshot | null
+  service_snapshots: ServiceSnapshot[]
+  task_runtime_context: TaskRuntimeContext
+  active_alerts: MonitorAlert[]
+  recent_alerts: MonitorAlert[]
+}
+
+export type MonitorHistoryPoint = {
+  recorded_at: number
+  overview: MonitorOverview
 }
 
 export type ModelRecord = {

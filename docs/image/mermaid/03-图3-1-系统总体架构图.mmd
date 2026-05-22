@@ -1,0 +1,14 @@
+flowchart TD
+    A["Vue 3 前端工作台"] --> B["Gateway Service"]
+    B --> C["Auth Service"]
+    B --> D["Model Service"]
+    B --> E["Task Service"]
+    B --> F["Asset Service"]
+    B --> G["Audit Service"]
+    E --> H["Redis Stream"]
+    H --> I["Python AI Worker"]
+    I --> J["Generation Runtime"]
+    I --> K["Scoring Runtime"]
+    F --> L["MySQL"]
+    G --> L
+    F --> M["输出图片 / 检查图 / 日志"]

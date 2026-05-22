@@ -83,6 +83,9 @@ class Settings:
     redis_url: str = "redis://localhost:6379/0"
     unipic2_offload_mode: str = DEFAULT_UNIPIC2_OFFLOAD_MODE
     scoring_release_after_batch: bool = True
+    openai_api_key: str | None = None
+    openai_base_url: str = "https://geekspace.cloud/v1"
+    openai_image_model: str = "gpt-image-2"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -101,6 +104,9 @@ class Settings:
                 allowed={"model", "sequential", "none"},
             ),
             scoring_release_after_batch=_read_bool_env("ELECTRIC_AI_SCORING_RELEASE_AFTER_BATCH", True),
+            openai_api_key=os.getenv("OPENAI_API_KEY"),
+            openai_base_url=os.getenv("OPENAI_BASE_URL", "https://geekspace.cloud/v1"),
+            openai_image_model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2"),
         )
 
     @property

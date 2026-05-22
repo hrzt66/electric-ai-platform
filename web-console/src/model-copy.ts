@@ -22,6 +22,10 @@ const LOCALIZED_MODEL_COPY: Record<string, LocalizedModelCopy> = {
     display_name: 'UniPic2 电力场景版',
     description: '更强调复杂语义和场景上下文的电力生成模型，适合多元素组合画面。',
   },
+  'gpt-image-2': {
+    display_name: 'GPT Image 2 电力云生图',
+    description: '通过 OpenAI 兼容 Image 2 API 生成高质量电力场景图片，适合不依赖本地显卡的云端出图。',
+  },
   'electric-score-v1': {
     display_name: '电力评分 V1（兼容版）',
     description: '兼容旧流程的四维评分模型，组合 ImageReward、CLIP-IQA 与美学预测能力。',
@@ -56,4 +60,3 @@ export function localizeModelRecord(model: ModelRecord): ModelRecord {
 export function localizeModelRecords(models: ModelRecord[]): ModelRecord[] {
   return models.map(localizeModelRecord)
 }
-

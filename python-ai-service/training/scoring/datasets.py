@@ -16,10 +16,15 @@ from PIL import Image
 
 from training.common.jsonl import write_jsonl
 from training.scoring.modeling import (
-    GENERIC_ELECTRIC_TERMS,
-    PROMPT_CLASS_ALIASES,
     clamp_score,
-    score_detected_topology,
+)
+from training.scoring.rubric import (
+    build_prompt_expectation,
+    canonicalize_detection_class_name,
+    score_composition_aesthetics,
+    score_physical_plausibility,
+    score_text_consistency,
+    score_visual_fidelity,
 )
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -56,20 +61,6 @@ CLASS_COMPONENT_ALIASES = {
     "dam": "dam",
     "check dam": "dam",
     "hydroelectric dam": "dam",
-    "person": "maintenance_ppe",
-    "worker": "maintenance_ppe",
-    "hardhat": "maintenance_ppe",
-    "helmet": "maintenance_ppe",
-    "vest": "maintenance_ppe",
-    "glove": "maintenance_ppe",
-    "gloves": "maintenance_ppe",
-    "boot": "maintenance_ppe",
-    "boots": "maintenance_ppe",
-    "no_hardhat": "maintenance_ppe",
-    "no vest": "maintenance_ppe",
-    "no_vest": "maintenance_ppe",
-    "no_gloves": "maintenance_ppe",
-    "no_boots": "maintenance_ppe",
 }
 CLASSIFICATION_COMPONENT_PREFIX = {
     "blq": "substation_primary",
@@ -770,34 +761,39 @@ def _build_row(
     source_name: str,
     power_classes: list[str],
 ) -> dict[str, object]:
+    detections = [
+        {
+            **item,
+            "class_name": canonicalize_detection_class_name(str(item["class_name"])),
+        }
+        for item in detections
+        if canonicalize_detection_class_name(str(item["class_name"])) in power_classes
+    ]
     with Image.open(image_path).convert("RGB") as image:
         image_features = _analyze_image(image=image, detections=detections)
-    prompt_features = _analyze_prompt(prompt=prompt, detections=detections)
+    prompt_expectation = build_prompt_expectation(prompt, detections)
     targets = {
-        "visual_fidelity": clamp_score(
-            10.0
-            + image_features["sharpness"] * 0.40
-            + image_features["contrast"] * 0.20
-            + image_features["exposure"] * 0.20
+        "visual_fidelity": score_visual_fidelity(
+            image_metrics=image_features,
+            detections=detections,
+            semantic_prior=64.0 + min(18.0, len(detections) * 2.0),
         ),
-        "text_consistency": clamp_score(
-            8.0
-            + prompt_features["keyword_coverage"] * 0.58
-            + prompt_features["electric_presence"] * 0.22
-            + min(14.0, len(detections) * 2.0)
+        "text_consistency": score_text_consistency(
+            prompt=prompt,
+            detections=detections,
+            semantic_prior=62.0 + min(20.0, len(prompt_expectation.expected_classes) * 3.0),
         ),
-        "physical_plausibility": clamp_score(
-            6.0
-            + prompt_features["topology"] * 0.62
-            + prompt_features["keyword_coverage"] * 0.16
-            + min(12.0, len(detections) * 2.5)
+        "physical_plausibility": score_physical_plausibility(
+            prompt=prompt,
+            detections=detections,
+            semantic_prior=60.0 + min(18.0, len(prompt_expectation.expected_classes) * 3.0),
+            image=image,
+            physical_part_detections=[],
         ),
-        "composition_aesthetics": clamp_score(
-            8.0
-            + image_features["coverage"] * 0.28
-            + image_features["balance"] * 0.28
-            + image_features["contrast"] * 0.14
-            + image_features["exposure"] * 0.16
+        "composition_aesthetics": score_composition_aesthetics(
+            image_metrics=image_features,
+            detections=detections,
+            semantic_prior=66.0 + min(16.0, len(detections) * 2.0),
         ),
     }
     return {
@@ -870,39 +866,6 @@ def _analyze_image(*, image: Image.Image, detections: list[dict[str, object]]) -
         "contrast": contrast,
         "coverage": clamp_score(coverage_score),
         "balance": clamp_score(balance_score),
-    }
-
-
-def _analyze_prompt(*, prompt: str, detections: list[dict[str, object]]) -> dict[str, object]:
-    lower_prompt = prompt.lower()
-    prompt_tokens = set(token for token in lower_prompt.replace(",", " ").split() if token)
-    expected_classes: set[str] = set()
-    for phrase, aliases in PROMPT_CLASS_ALIASES.items():
-        if phrase in lower_prompt:
-            expected_classes.update(aliases)
-
-    detected_classes = {
-        str(item["class_name"])
-        for item in detections
-        if float(item.get("confidence", 0.0)) >= 0.20
-    }
-    matched_classes = expected_classes & detected_classes
-    if expected_classes:
-        keyword_coverage = 100.0 * len(matched_classes) / len(expected_classes)
-    elif prompt_tokens & GENERIC_ELECTRIC_TERMS:
-        keyword_coverage = 60.0 + min(40.0, len(detected_classes) * 10.0)
-    else:
-        keyword_coverage = 50.0
-
-    electric_presence = 35.0 + min(55.0, len(detected_classes) * 8.0)
-    topology = score_detected_topology(detected_classes)
-
-    return {
-        "expected_classes": sorted(expected_classes),
-        "matched_classes": sorted(matched_classes),
-        "keyword_coverage": clamp_score(keyword_coverage),
-        "electric_presence": clamp_score(electric_presence if detected_classes else 30.0),
-        "topology": clamp_score(topology if detected_classes else 28.0),
     }
 
 

@@ -1,0 +1,70 @@
+erDiagram
+    auth_users {
+        BIGINT id PK
+        VARCHAR username
+        VARCHAR password_hash
+        VARCHAR display_name
+        VARCHAR status
+    }
+    model_registry {
+        BIGINT id PK
+        VARCHAR model_name
+        VARCHAR model_type
+        VARCHAR service_name
+        VARCHAR status
+    }
+    task_jobs {
+        BIGINT id PK
+        VARCHAR job_type
+        VARCHAR status
+        VARCHAR stage
+        VARCHAR model_name
+        VARCHAR scoring_model_name
+        TEXT prompt
+        TEXT negative_prompt
+    }
+    asset_images {
+        BIGINT id PK
+        BIGINT job_id FK
+        VARCHAR image_name
+        VARCHAR file_path
+        VARCHAR model_name
+        VARCHAR status
+    }
+    asset_image_prompts {
+        BIGINT id PK
+        BIGINT image_id FK
+        TEXT positive_prompt
+        TEXT negative_prompt
+        INT sampling_steps
+        BIGINT seed
+        DECIMAL guidance_scale
+    }
+    asset_image_scores {
+        BIGINT id PK
+        BIGINT image_id FK
+        DECIMAL visual_fidelity
+        DECIMAL text_consistency
+        DECIMAL physical_plausibility
+        DECIMAL composition_aesthetics
+        DECIMAL total_score
+    }
+    asset_image_score_explanations {
+        BIGINT id PK
+        BIGINT image_id FK
+        VARCHAR checked_image_path
+        LONGTEXT explanation_json
+    }
+    audit_task_events {
+        BIGINT id PK
+        BIGINT job_id FK
+        VARCHAR event_type
+        TEXT message
+        LONGTEXT payload_json
+    }
+
+    task_jobs ||--o{ asset_images : has
+    asset_images ||--|| asset_image_prompts : owns
+    asset_images ||--|| asset_image_scores : owns
+    asset_images ||--o| asset_image_score_explanations : owns
+    task_jobs ||--o{ audit_task_events : has

@@ -59,7 +59,7 @@ Invoke-CheckedCommand `
   -Arguments @("scripts/download_models.py", "--all", "--check") `
   -WorkingDirectory $pythonServiceRoot
 
-$portsToFree = @(8081, 8082, 8083, 8084, 8085, 8080, 8090)
+$portsToFree = @(8081, 8082, 8083, 8084, 8085, 8086, 8080, 8090)
 if (-not $SkipWeb) {
   $portsToFree += 5173
 }
@@ -138,6 +138,19 @@ $goServices = @(
     }
   },
   @{
+    Name        = "monitor-service"
+    PackagePath = ".\\services\\monitor-service\\cmd\\server"
+    Port        = 8086
+    HealthUrl   = "http://127.0.0.1:8086/health"
+    Environment = @{
+      APP_NAME   = "monitor-service"
+      HTTP_PORT  = "8086"
+      MYSQL_DSN  = $mysqlDsn
+      REDIS_ADDR = $redisAddr
+      JWT_SECRET = $jwtSecret
+    }
+  },
+  @{
     Name        = "gateway-service"
     PackagePath = ".\\services\\gateway-service\\cmd\\server"
     Port        = 8080
@@ -151,6 +164,7 @@ $goServices = @(
       TASK_SERVICE_URL  = "http://127.0.0.1:8083"
       ASSET_SERVICE_URL = "http://127.0.0.1:8084"
       AUDIT_SERVICE_URL = "http://127.0.0.1:8085"
+      MONITOR_SERVICE_URL = "http://127.0.0.1:8086"
       IMAGE_OUTPUT_DIR  = $imageOutputDir
     }
   }
@@ -242,4 +256,3 @@ if (-not $SkipWeb) {
 Write-Info "Logs: $windowsLogsRoot"
 Write-Info "MySQL: 127.0.0.1:$MySQLPort"
 Write-Info "Redis: 127.0.0.1:$RedisPort"
-

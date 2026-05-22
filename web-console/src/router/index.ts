@@ -6,6 +6,7 @@ import DashboardView from '../views/DashboardView.vue'
 import GenerateView from '../views/GenerateView.vue'
 import HistoryView from '../views/HistoryView.vue'
 import LoginView from '../views/LoginView.vue'
+import MonitorCockpitView from '../views/MonitorCockpitView.vue'
 import ModelCenterView from '../views/ModelCenterView.vue'
 import TaskAuditView from '../views/TaskAuditView.vue'
 
@@ -24,6 +25,7 @@ export function createAppRouter(history: RouterHistory) {
           { path: 'generate', component: GenerateView },
           { path: 'history', component: HistoryView },
           { path: 'models', component: ModelCenterView },
+          { path: 'monitor', component: MonitorCockpitView },
           { path: 'tasks/audit', component: TaskAuditView },
           { path: 'tasks/audit/:id', component: TaskAuditView },
         ],

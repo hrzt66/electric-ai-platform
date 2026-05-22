@@ -43,18 +43,22 @@ function createDetail(): AssetDetail {
       checked_image_path: 'model/image_check/27_0_1011411730.png',
       dimensions: {
         visual_fidelity: {
-          uses_yolo: false,
+          uses_yolo: true,
           summary: '画面细节尚可，但整体锐度仍有下降。',
-          formula: '基于学生模型输出并参考锐度、曝光、对比度进行说明。',
-          details: ['锐度一般，因此细节边缘不够扎实。'],
+          formula: '最终视觉保真 = 基础清晰度/曝光/对比度 + 检测主类结构清晰度补偿；按主类使用 5 套规则。',
+          details: ['主判类别为 transmission_tower，视觉保真会按该电力主类切换对应规则。'],
           inputs: {
+            raw_score: 49.4,
+            calibrated_score: 49.4,
+            final_score: 49.4,
             sharpness: 46.53,
+            target_class: 'transmission_tower',
           },
         },
         text_consistency: {
           uses_yolo: true,
           summary: '提示词要求的关键设备没有完全检测到。',
-          formula: '0.42 * 基础文本分 + 0.58 * 检测语义信号',
+          formula: '最终文本一致 = 检测匹配召回 + 目标置信度质量 + 少量语义先验补充。',
           details: ['仅检测到 tower，缺少 line 与 insulator。'],
           detections: [{ class_name: 'tower', confidence: 0.39 }],
           matched_classes: ['tower'],

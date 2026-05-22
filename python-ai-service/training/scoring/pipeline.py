@@ -161,6 +161,12 @@ def run_scoring_training(
         device=device,
         active_classes=active_power_classes,
     )
+    physical_part_yolo_report = _train_physical_part_yolo_auxiliary(
+        training_root=paths.scoring_training_root,
+        bundle_dir=bundle_dir,
+        config=training_config,
+        device=device,
+    )
 
     train_dataset = ScoreManifestDataset(train_rows, vocab=vocab, image_size=training_config.image_size, targets=training_config.targets)
     val_dataset = ScoreManifestDataset(val_rows, vocab=vocab, image_size=training_config.image_size, targets=training_config.targets)
@@ -191,20 +197,26 @@ def run_scoring_training(
     history: list[dict[str, float | int]] = []
     best_state: dict[str, torch.Tensor] | None = None
     best_val_mae = float("inf")
+    epoch_metrics_dir = paths.scoring_training_root / "epoch_metrics"
+    epoch_metrics_dir.mkdir(parents=True, exist_ok=True)
 
     for epoch in range(1, training_config.epochs + 1):
         train_loss = _run_epoch(model=model, loader=train_loader, device=device, optimizer=optimizer, loss_fn=loss_fn)
         val_metrics = _evaluate(model=model, loader=val_loader, device=device, targets=training_config.targets)
-        history.append(
-            {
-                "epoch": epoch,
-                "train_loss": round(train_loss, 6),
-                "val_mae": round(val_metrics["mae"], 6),
-            }
-        )
+        epoch_record = {
+            "epoch": epoch,
+            "train_loss": round(train_loss, 6),
+            "val_mae": round(val_metrics["mae"], 6),
+            "val_per_target_mae": val_metrics["per_target_mae"],
+        }
+        history.append(epoch_record)
         paths.scoring_training_root.mkdir(parents=True, exist_ok=True)
         (paths.scoring_training_root / "history.json").write_text(
             json.dumps(history, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (epoch_metrics_dir / f"epoch_{epoch:03d}.json").write_text(
+            json.dumps(epoch_record, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         print(
@@ -244,6 +256,7 @@ def run_scoring_training(
                 "best_val_mae": round(best_val_mae, 6),
                 "test_metrics": test_metrics,
                 "yolo": yolo_report,
+                "physical_part_yolo": physical_part_yolo_report,
                 "active_classes": active_power_classes,
             },
             ensure_ascii=False,
@@ -260,6 +273,7 @@ def run_scoring_training(
         "epochs": training_config.epochs,
         "device": str(device),
         "history_path": str(paths.scoring_training_root / "history.json"),
+        "epoch_metrics_dir": str(epoch_metrics_dir),
         "bundle_config_path": str(bundle_dir / "bundle_config.json"),
         "train_count": len(train_rows),
         "val_count": len(val_rows),
@@ -267,6 +281,7 @@ def run_scoring_training(
         "active_classes": active_power_classes,
         "class_support": class_support,
         "yolo": yolo_report,
+        "physical_part_yolo": physical_part_yolo_report,
     }
     paths.scoring_training_root.mkdir(parents=True, exist_ok=True)
     (paths.scoring_training_root / "history.json").write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -341,12 +356,24 @@ def _train_yolo_auxiliary(
     device: torch.device,
     active_classes: list[str] | None = None,
 ) -> dict[str, object]:
-    if not manifest_summary.get("yolo_datasets"):
+    existing_weight = bundle_dir / "yolo_aux.pt"
+    if config.reuse_existing_yolo_aux and existing_weight.exists():
+        return {
+            "status": "reused",
+            "weights": str(existing_weight),
+            "profile": config.yolo_profile,
+            "dataset_variant": config.yolo_train_variant,
+            "reason": "reuse-existing-yolo-aux",
+        }
+
+    configured_datasets = _resolve_configured_yolo_datasets(config)
+    yolo_datasets = configured_datasets or [str(item) for item in manifest_summary.get("yolo_datasets", [])]
+    if not yolo_datasets:
         return {"status": "skipped", "reason": "no-detection-dataset"}
 
     primary_yaml = _prepare_yolo_training_dataset(
         training_root=training_root,
-        yolo_datasets=[str(item) for item in manifest_summary["yolo_datasets"]],
+        yolo_datasets=yolo_datasets,
         active_classes=active_classes,
     )
     training_yaml = _maybe_build_high_map_training_dataset(
@@ -371,13 +398,22 @@ def _train_yolo_auxiliary(
             exist_ok=False,
             optimizer=config.yolo_optimizer,
             lr0=config.yolo_learning_rate,
+            lrf=config.yolo_lrf,
             weight_decay=config.yolo_weight_decay,
             warmup_epochs=config.yolo_warmup_epochs,
+            patience=config.yolo_patience,
             verbose=False,
             val=config.yolo_validate_each_epoch,
             rect=config.yolo_rect,
             mosaic=config.yolo_mosaic,
             close_mosaic=config.yolo_close_mosaic,
+            mixup=config.yolo_mixup,
+            copy_paste=config.yolo_copy_paste,
+            translate=config.yolo_translate,
+            scale=config.yolo_scale,
+            hsv_h=config.yolo_hsv_h,
+            hsv_s=config.yolo_hsv_s,
+            hsv_v=config.yolo_hsv_v,
             plots=False,
         )
         best_path = Path(train_result.save_dir) / "weights" / "best.pt"
@@ -389,7 +425,7 @@ def _train_yolo_auxiliary(
                 "dataset": str(training_yaml),
                 "profile": config.yolo_profile,
                 "dataset_variant": config.yolo_train_variant,
-                "dataset_count": len(manifest_summary["yolo_datasets"]),
+                "dataset_count": len(yolo_datasets),
                 "save_dir": str(train_result.save_dir),
             }
             if config.yolo_run_final_validation:
@@ -413,6 +449,103 @@ def _train_yolo_auxiliary(
         return {"status": "missing-best-weight", "save_dir": str(train_result.save_dir)}
     except Exception as exc:  # pragma: no cover - runtime fallback
         return {"status": "failed", "error": str(exc)}
+
+
+def _train_physical_part_yolo_auxiliary(
+    *,
+    training_root: Path,
+    bundle_dir: Path,
+    config: ScoringTrainingConfig,
+    device: torch.device,
+) -> dict[str, object]:
+    existing_weight = bundle_dir / "yolo_physical_parts.pt"
+    if config.reuse_existing_physical_part_yolo_aux and existing_weight.exists():
+        return {
+            "status": "reused",
+            "weights": str(existing_weight),
+            "profile": config.physical_part_yolo_profile,
+            "dataset_variant": config.physical_part_yolo_train_variant,
+            "reason": "reuse-existing-physical-part-yolo-aux",
+        }
+
+    raw_path = str(config.physical_part_yolo_dataset_yaml or "").strip()
+    if not raw_path:
+        return {"status": "skipped", "reason": "no-physical-part-dataset"}
+
+    dataset_yaml = Path(raw_path).expanduser()
+    if not dataset_yaml.is_absolute():
+        repo_root = Path(__file__).resolve().parents[3]
+        dataset_yaml = (repo_root / dataset_yaml).resolve()
+    if not dataset_yaml.exists():
+        return {"status": "skipped", "reason": "physical-part-dataset-missing", "dataset": str(dataset_yaml)}
+
+    yolo_output_root = training_root / "yolo-physical-parts"
+    yolo_output_root.mkdir(parents=True, exist_ok=True)
+    run_name = f"electric-physical-parts-{config.physical_part_yolo_train_variant}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    try:
+        model = YOLO(config.yolo_model_name)
+        train_result = model.train(
+            data=str(dataset_yaml),
+            epochs=config.yolo_epochs,
+            imgsz=config.yolo_image_size,
+            batch=config.yolo_batch_size,
+            device=str(device),
+            project=str(yolo_output_root),
+            name=run_name,
+            exist_ok=False,
+            optimizer=config.yolo_optimizer,
+            lr0=config.yolo_learning_rate,
+            lrf=config.yolo_lrf,
+            weight_decay=config.yolo_weight_decay,
+            warmup_epochs=config.yolo_warmup_epochs,
+            patience=config.yolo_patience,
+            verbose=False,
+            val=config.yolo_validate_each_epoch,
+            rect=config.yolo_rect,
+            mosaic=config.yolo_mosaic,
+            close_mosaic=config.yolo_close_mosaic,
+            mixup=config.yolo_mixup,
+            copy_paste=config.yolo_copy_paste,
+            translate=config.yolo_translate,
+            scale=config.yolo_scale,
+            hsv_h=config.yolo_hsv_h,
+            hsv_s=config.yolo_hsv_s,
+            hsv_v=config.yolo_hsv_v,
+            plots=False,
+        )
+        best_path = Path(train_result.save_dir) / "weights" / "best.pt"
+        if best_path.exists():
+            shutil.copy2(best_path, bundle_dir / "yolo_physical_parts.pt")
+            report = {
+                "status": "trained",
+                "weights": str(bundle_dir / "yolo_physical_parts.pt"),
+                "dataset": str(dataset_yaml),
+                "profile": config.physical_part_yolo_profile,
+                "dataset_variant": config.physical_part_yolo_train_variant,
+                "save_dir": str(train_result.save_dir),
+            }
+            if config.yolo_run_final_validation:
+                try:
+                    validation = model.val(
+                        data=str(dataset_yaml),
+                        imgsz=config.yolo_image_size,
+                        batch=config.yolo_batch_size,
+                        device=str(device),
+                        split="val",
+                        rect=config.yolo_rect,
+                        plots=False,
+                        verbose=False,
+                    )
+                    metrics = _extract_yolo_metrics(validation)
+                    if metrics:
+                        report["validation"] = metrics
+                except Exception as exc:  # pragma: no cover
+                    report["validation_error"] = str(exc)
+            return report
+        return {"status": "missing-best-weight", "save_dir": str(train_result.save_dir)}
+    except Exception as exc:  # pragma: no cover
+        return {"status": "failed", "error": str(exc), "dataset": str(dataset_yaml)}
 
 
 def _maybe_build_high_map_training_dataset(
@@ -440,7 +573,6 @@ def _maybe_build_high_map_training_dataset(
             "substation_primary": 2,
             "solar_panel": 3,
             "dam": 2,
-            "maintenance_ppe": 3,
         },
         min_box_area=0.0004,
         variant_name=config.yolo_train_variant,
@@ -457,8 +589,12 @@ def _prepare_yolo_training_dataset(
     dataset_paths = [Path(item) for item in yolo_datasets]
     target_names = [str(item) for item in active_classes] if active_classes else None
 
-    if len(dataset_paths) == 1 and target_names is None:
-        return dataset_paths[0]
+    if len(dataset_paths) == 1:
+        payload = yaml.safe_load(dataset_paths[0].read_text(encoding="utf-8")) or {}
+        source_names = payload.get("names", [])
+        source_names = [str(item) for item in source_names.values()] if isinstance(source_names, dict) else [str(item) for item in source_names]
+        if target_names is None or source_names == target_names:
+            return dataset_paths[0]
 
     merged_root = training_root / "yolo-merged"
     if merged_root.exists():
@@ -562,3 +698,17 @@ def _extract_yolo_metrics(metrics) -> dict[str, float]:
         except (TypeError, ValueError):
             continue
     return payload
+
+
+def _resolve_configured_yolo_datasets(config: ScoringTrainingConfig) -> list[str]:
+    raw_path = str(config.yolo_dataset_yaml or "").strip()
+    if not raw_path:
+        return []
+
+    dataset_yaml = Path(raw_path).expanduser()
+    if not dataset_yaml.is_absolute():
+        repo_root = Path(__file__).resolve().parents[3]
+        dataset_yaml = (repo_root / dataset_yaml).resolve()
+    if not dataset_yaml.exists():
+        return []
+    return [str(dataset_yaml)]

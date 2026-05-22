@@ -1,0 +1,12 @@
+{
+  "登录与统一入口": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/ui/login-view.png",
+  "概览页": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/ui/dashboard-view.png",
+  "模型中心": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/ui/model-center-view.png",
+  "生成工作台": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/ui/generate-view.png",
+  "历史中心与详情": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/ui/history-view.png",
+  "任务审计": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/ui/task-audit-view.png",
+  "图2-1 Stable Diffusion 结构与生成流程图": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/01-图2-1-Stable-Diffusion-结构与生成流程图.png",
+  "图2-3 平台前后端与 AI 运行时协同流程图": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/02-图2-3-平台前后端与-AI-运行时协同流程图.png",
+  "图3-1 系统总体架构图": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/03-图3-1-系统总体架构图.png",
+  "图3-2 系统数据库 E-R 图": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/04-图3-2-系统数据库-E-R-图.png"
+}

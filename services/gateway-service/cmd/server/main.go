@@ -23,6 +23,7 @@ func main() {
 		Task:        service.NewReverseProxy(getenv("TASK_SERVICE_URL", "http://localhost:8083")),
 		Asset:       service.NewReverseProxy(getenv("ASSET_SERVICE_URL", "http://localhost:8084")),
 		Audit:       service.NewReverseProxy(getenv("AUDIT_SERVICE_URL", "http://localhost:8085")),
+		Monitor:     service.NewReverseProxy(getenv("MONITOR_SERVICE_URL", "http://localhost:8086")),
 		Files:       service.NewStaticFileHandler(getenv("IMAGE_OUTPUT_DIR", "model/image"), "/files/images/"),
 		ImageChecks: service.NewStaticFileHandler(resolveImageCheckDir(), "/files/image-checks/"),
 	}

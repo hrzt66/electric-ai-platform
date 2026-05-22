@@ -39,4 +39,21 @@ describe('app router', () => {
 
     expect(router.currentRoute.value.path).toBe('/dashboard')
   })
+
+  it('allows authenticated users to access monitor route', async () => {
+    const { createAppRouter } = await import('./index')
+    const router = createAppRouter(createMemoryHistory())
+    const authStore = useAuthStore()
+    authStore.setSession({
+      accessToken: 'token-123',
+      userName: 'admin',
+      displayName: '系统管理员',
+    })
+
+    await router.push('/monitor')
+
+    expect(router.currentRoute.value.path).toBe('/monitor')
+    expect(router.currentRoute.value.matched.length).toBeGreaterThan(0)
+    expect(router.currentRoute.value.matched.at(-1)?.path).toBe('/monitor')
+  })
 })

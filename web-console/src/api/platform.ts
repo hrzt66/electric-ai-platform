@@ -10,6 +10,7 @@ import type {
   GenerateTask,
   GenerateTaskRequest,
   ModelRecord,
+  MonitorOverview,
 } from '../types/platform'
 
 async function unwrap<T>(request: Promise<{ data: ApiEnvelope<T> }>): Promise<T> {
@@ -70,6 +71,14 @@ export function listTaskAuditEvents(taskId: number) {
 // listModels 拉取模型中心展示用的模型目录。
 export function listModels() {
   return unwrap<ModelRecord[]>(http.get('/models'))
+}
+
+export function getMonitorOverview() {
+  return unwrap<MonitorOverview>(http.get('/monitor/overview'))
+}
+
+export function getMonitorStreamUrl() {
+  return '/api/v1/monitor/stream'
 }
 
 export function buildImageUrl(filePath: string) {

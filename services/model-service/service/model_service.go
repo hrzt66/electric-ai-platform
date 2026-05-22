@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"electric-ai/services/model-service/model"
 )
@@ -48,6 +49,12 @@ func (s *ModelService) GetModel(ctx context.Context, modelName string) (Registry
 // hydrateStatus 用实际磁盘内容覆盖注册表中的状态，避免“表里存在但目录为空”误报为可用。
 func hydrateStatus(item RegistryModel) RegistryModel {
 	if item.LocalPath == "" {
+		return item
+	}
+
+	// API-backed models are selectable even though they do not have local checkpoint files.
+	if strings.HasPrefix(item.LocalPath, "api/") {
+		item.Status = "available"
 		return item
 	}
 

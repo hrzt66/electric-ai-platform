@@ -15,6 +15,7 @@ type Upstreams struct {
 	Task        *httputil.ReverseProxy
 	Asset       *httputil.ReverseProxy
 	Audit       *httputil.ReverseProxy
+	Monitor     *httputil.ReverseProxy
 	Files       http.Handler
 	ImageChecks http.Handler
 }
@@ -36,6 +37,10 @@ func New(upstreams Upstreams) *gin.Engine {
 	secured.Any("/api/v1/assets/*path", gin.WrapH(upstreams.Asset))
 	secured.Any("/api/v1/audit", gin.WrapH(upstreams.Audit))
 	secured.Any("/api/v1/audit/*path", gin.WrapH(upstreams.Audit))
+	if upstreams.Monitor != nil {
+		secured.Any("/api/v1/monitor", gin.WrapH(upstreams.Monitor))
+		secured.Any("/api/v1/monitor/*path", gin.WrapH(upstreams.Monitor))
+	}
 
 	r.Any("/files/images/*path", gin.WrapH(upstreams.Files))
 	if upstreams.ImageChecks != nil {

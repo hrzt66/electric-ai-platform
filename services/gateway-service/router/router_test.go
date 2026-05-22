@@ -53,6 +53,56 @@ func TestTasksIndexIsProxiedWithoutRedirect(t *testing.T) {
 	}
 }
 
+func TestMonitorStreamIsProxiedAndPreservesSSEContent(t *testing.T) {
+	monitorUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/monitor/stream" {
+			t.Fatalf("expected upstream path /api/v1/monitor/stream, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "event: snapshot\ndata: {\"overall_health\":\"healthy\"}\n\n")
+	}))
+	defer monitorUpstream.Close()
+
+	engine := New(Upstreams{
+		Auth:  service.NewReverseProxy(monitorUpstream.URL),
+		Model: service.NewReverseProxy(monitorUpstream.URL),
+		Task:  service.NewReverseProxy(monitorUpstream.URL),
+		Asset: service.NewReverseProxy(monitorUpstream.URL),
+		Audit: service.NewReverseProxy(monitorUpstream.URL),
+		Monitor: service.NewReverseProxy(monitorUpstream.URL),
+		Files: http.NotFoundHandler(),
+	})
+	gateway := httptest.NewServer(engine)
+	defer gateway.Close()
+
+	request, err := http.NewRequest(http.MethodGet, gateway.URL+"/api/v1/monitor/stream", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	request.Header.Set("Authorization", "Bearer test-token")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d with body %s", response.StatusCode, string(body))
+	}
+	if ct := response.Header.Get("Content-Type"); ct == "" || len(ct) < len("text/event-stream") || ct[:len("text/event-stream")] != "text/event-stream" {
+		t.Fatalf("expected Content-Type to start with text/event-stream, got %q body=%s", ct, string(body))
+	}
+	if string(body) != "event: snapshot\ndata: {\"overall_health\":\"healthy\"}\n\n" {
+		t.Fatalf("unexpected SSE body: %q", string(body))
+	}
+}
+
 func TestImageCheckFilesAreServedWithoutAuthentication(t *testing.T) {
 	tempDir := t.TempDir()
 	imagePath := filepath.Join(tempDir, "job-1.png")

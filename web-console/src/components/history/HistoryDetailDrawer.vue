@@ -20,6 +20,31 @@ const explanationVisible = ref(false)
 const activeDimensionKey = ref<ScoreDimensionKey | null>(null)
 const checkedImageUrl = ref('')
 
+const INPUT_LABELS: Record<string, string> = {
+  raw_score: '原始分',
+  calibrated_score: '校准分',
+  final_score: '最终分',
+  sharpness: '锐度',
+  exposure: '曝光',
+  contrast: '对比度',
+  target_class: '主判类别',
+  keyword_coverage: '关键词覆盖度',
+  electric_presence: '电力语义存在度',
+  topology: '拓扑信号',
+  rule_score: '结构规则均分',
+  geometry_penalty: '几何异常惩罚',
+  coverage: '主体覆盖率',
+  balance: '平衡性',
+  detection_gate_triggered: '检测门控触发',
+  weights: '权重',
+  contributions: '加权贡献',
+  visual_fidelity: '视觉保真',
+  text_consistency: '文本一致',
+  physical_plausibility: '物理合理',
+  composition_aesthetics: '构图美学',
+  total_score: '总分',
+}
+
 const DIMENSION_LABELS: Record<ScoreDimensionKey, string> = {
   visual_fidelity: '视觉保真',
   text_consistency: '文本一致',
@@ -103,7 +128,7 @@ const activeCheckedImagePath = computed(() => {
 const activeInputRows = computed(() => {
   const inputs = activeExplanation.value?.inputs ?? {}
   return Object.entries(inputs).map(([key, value]) => ({
-    key,
+    key: INPUT_LABELS[key] ?? key,
     value: formatInputValue(value),
   }))
 })
@@ -163,8 +188,14 @@ function formatInputValue(value: unknown): string {
   }
   if (value && typeof value === 'object') {
     return Object.entries(value as Record<string, unknown>)
-      .map(([key, item]) => `${key}: ${formatInputValue(item)}`)
+      .map(([key, item]) => `${INPUT_LABELS[key] ?? key}: ${formatInputValue(item)}`)
       .join('；')
+  }
+  if (typeof value === 'boolean') {
+    return value ? '是' : '否'
+  }
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? String(value) : value.toFixed(2)
   }
   return String(value)
 }
@@ -257,6 +288,16 @@ function guessCheckedImagePath(filePath: string): string {
                 <dd>{{ row.value }}</dd>
               </div>
             </dl>
+          </section>
+
+          <section v-if="activeExplanation.uses_yolo || activeExplanation.uses_gpt" class="explanation-block">
+            <div class="section-title">评分依据来源</div>
+            <div class="tag-groups">
+              <div class="tag-group">
+                <el-tag v-if="activeExplanation.uses_yolo" type="success" effect="plain">YOLO 检测已参与</el-tag>
+                <el-tag v-if="activeExplanation.uses_gpt" type="warning" effect="plain">GPT 视觉判定已参与</el-tag>
+              </div>
+            </div>
           </section>
 
           <section v-if="activeExplanation.uses_yolo" class="explanation-block">

@@ -41,7 +41,6 @@ def main() -> int:
                 "substation_primary": 2,
                 "solar_panel": 3,
                 "dam": 2,
-                "maintenance_ppe": 3,
             },
             min_box_area=0.0004,
         )

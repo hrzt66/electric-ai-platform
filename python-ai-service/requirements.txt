@@ -25,3 +25,5 @@ image-reward==1.5
 clip-anytorch==2.6.0
 ftfy==6.3.1
 ultralytics==8.4.33
+openai>=1.0.0
+requests>=2.31.0

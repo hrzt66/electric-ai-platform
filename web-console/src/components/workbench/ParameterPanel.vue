@@ -19,6 +19,7 @@ const selectedModel = computed(() => props.models.find((item) => item.model_name
 const selectedScoringModel = computed(
   () => props.scoringModels.find((item) => item.model_name === props.form.scoring_model_name) ?? null,
 )
+const isImage2Model = computed(() => props.form.model_name === 'gpt-image-2')
 </script>
 
 <template>
@@ -46,7 +47,7 @@ const selectedScoringModel = computed(
       <div v-if="selectedModel" class="model-tip">
         <p class="tip-name">{{ selectedModel.display_name || selectedModel.model_name }}</p>
         <p class="tip-text">{{ selectedModel.description || '暂无模型说明' }}</p>
-        <el-button size="small" text type="primary" @click="emit('fillDefaults', selectedModel)">应用推荐提示词</el-button>
+        <el-button size="small" text type="primary" @click="emit('fillDefaults', selectedModel)">应用系统提示词</el-button>
       </div>
 
       <el-form-item label="评分模型">
@@ -69,11 +70,11 @@ const selectedScoringModel = computed(
         <el-input v-model="form.prompt" type="textarea" :rows="4" size="small" placeholder="描述你想生成的电力工业场景。" />
       </el-form-item>
 
-      <el-form-item label="负向提示词">
+      <el-form-item v-if="!isImage2Model" label="负向提示词">
         <el-input v-model="form.negative_prompt" type="textarea" :rows="2" size="small" placeholder="描述你想避免的瑕疵、失真或风格。" />
       </el-form-item>
 
-      <div class="grid-two">
+      <div v-if="!isImage2Model" class="grid-two">
         <el-form-item label="随机种子">
           <el-input-number v-model="form.seed" size="small" :min="-1" :max="2147483647" controls-position="right" />
         </el-form-item>
@@ -91,7 +92,7 @@ const selectedScoringModel = computed(
         </el-form-item>
       </div>
 
-      <div class="grid-two">
+      <div v-if="!isImage2Model" class="grid-two">
         <el-form-item label="宽度">
           <el-slider v-model="form.width" :min="64" :max="1024" :step="64" show-input />
         </el-form-item>

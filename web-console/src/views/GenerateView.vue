@@ -12,7 +12,9 @@ import { localizeModelRecord } from '../model-copy'
 import { usePlatformStore } from '../stores/platform'
 import type { GenerateTaskRequest, ModelRecord, ScoreSummary } from '../types/platform'
 import { FRONTEND_DEFAULT_NEGATIVE_PROMPT, FRONTEND_DEFAULT_POSITIVE_PROMPT } from './generate-defaults'
-import { GENERATION_RECOMMENDED_NEGATIVE_PROMPT, pickRecommendedGenerationPrompt } from './generate-recommendations'
+import {
+  pickRandomSystemPromptPreset,
+} from './generate-recommendations'
 
 const FALLBACK_SCORING_MODELS: ModelRecord[] = [
   localizeModelRecord({
@@ -139,10 +141,11 @@ async function submit() {
 }
 
 function fillDefaults(model: ModelRecord) {
-  // 点击推荐入口时，生成模型使用前端精选提示词，便于快速试图。
+  // 点击系统提示词入口时，在五类英文提示词里随机抽取一条。
   if (model.model_type === 'generation') {
-    form.prompt = pickRecommendedGenerationPrompt()
-    form.negative_prompt = GENERATION_RECOMMENDED_NEGATIVE_PROMPT
+    const preset = pickRandomSystemPromptPreset()
+    form.prompt = preset.positivePrompt
+    form.negative_prompt = preset.negativePrompt
     return
   }
 

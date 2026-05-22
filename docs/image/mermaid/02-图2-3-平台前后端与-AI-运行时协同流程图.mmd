@@ -1,0 +1,14 @@
+flowchart LR
+    U["用户前端工作台"] --> G["Gateway"]
+    G --> A["Auth Service"]
+    G --> M["Model Service"]
+    G --> T["Task Service"]
+    G --> S["Asset Service"]
+    G --> AU["Audit Service"]
+    T --> R["Redis Stream"]
+    R --> W["Python Worker"]
+    W --> GR["Generation Runtime"]
+    W --> SR["Scoring Runtime"]
+    W --> S
+    W --> AU
+    S --> DB["MySQL / 文件存储"]

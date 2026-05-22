@@ -39,14 +39,8 @@ PROMPT_CLASS_ALIASES = {
     "solar farm": {"solar_panel"},
     "dam": {"dam"},
     "hydroelectric": {"dam"},
-    "maintenance": {"maintenance_ppe"},
-    "lineman": {"maintenance_ppe", "transmission_tower"},
-    "linemen": {"maintenance_ppe", "transmission_tower"},
-    "worker": {"maintenance_ppe"},
-    "ppe": {"maintenance_ppe"},
-    "helmet": {"maintenance_ppe"},
-    "hardhat": {"maintenance_ppe"},
-    "safety vest": {"maintenance_ppe"},
+    "lineman": {"transmission_tower"},
+    "linemen": {"transmission_tower"},
 }
 GENERIC_ELECTRIC_TERMS = {
     "electric",
@@ -73,8 +67,6 @@ GENERIC_ELECTRIC_TERMS = {
     "dam",
     "lineman",
     "linemen",
-    "maintenance",
-    "ppe",
     "inspection",
 }
 
@@ -99,10 +91,6 @@ def score_detected_topology(detected_classes: set[str]) -> float:
         topology += 16.0
     if "dam" in detected_classes:
         topology += 18.0
-    if "maintenance_ppe" in detected_classes:
-        topology += 12.0
-    if {"maintenance_ppe", "transmission_tower"}.issubset(detected_classes) or {"maintenance_ppe", "tower"}.issubset(detected_classes):
-        topology += 12.0
     if {"tower", "line"}.issubset(detected_classes):
         topology += 12.0
 

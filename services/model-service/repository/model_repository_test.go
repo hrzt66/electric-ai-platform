@@ -66,4 +66,22 @@ func TestModelInitScriptsKeepRegistrySeedIdempotent(t *testing.T) {
 	if !strings.Contains(seed, "unipic2-kontext") {
 		t.Fatal("expected seed script to keep the UniPic2 generation model")
 	}
+	if !strings.Contains(seed, "gpt-image-2") {
+		t.Fatal("expected seed script to register the GPT Image 2 API generation model")
+	}
+}
+
+func TestModelRepositorySeedsGPTImage2ApiRuntime(t *testing.T) {
+	content, err := os.ReadFile("model_repository.go")
+	if err != nil {
+		t.Fatalf("read repository source: %v", err)
+	}
+
+	source := string(content)
+	if !strings.Contains(source, `ModelName:             "gpt-image-2"`) {
+		t.Fatal("expected repository seed list to include gpt-image-2")
+	}
+	if !strings.Contains(source, `LocalPath:             "api/openai/gpt-image-2"`) {
+		t.Fatal("expected gpt-image-2 to use an API local path marker")
+	}
 }

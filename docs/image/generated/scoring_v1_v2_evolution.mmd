@@ -1,0 +1,16 @@
+flowchart LR
+    A["electric-score-v1\n评分基线"] --> B["ImageReward\n文本一致性"]
+    A --> C["CLIP-IQA\n视觉保真/物理合理"]
+    A --> D["Aesthetic Predictor\n构图美学"]
+    B --> E["统一校准与加权"]
+    C --> E
+    D --> E
+    E --> F["四维评分结果"]
+    F --> G["平台闭环验证"]
+    G --> H["electric-score-v2\n自训练评分模型"]
+    H --> I["学生模型四维回归"]
+    H --> J["YOLO辅助检测"]
+    I --> K["分数校准"]
+    J --> L["文本一致/物理合理修正"]
+    K --> M["最终多维评分"]
+    L --> M

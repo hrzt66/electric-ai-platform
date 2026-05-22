@@ -47,10 +47,10 @@ class ScoringService:
         composition_aesthetics: float,
     ) -> dict[str, float]:
         calibrated = {
-            "visual_fidelity": self._compress_high_tail(visual_fidelity, knee=72.0, scale=0.38),
-            "text_consistency": self._lift_low_band(text_consistency, target=52.0, gain=0.22),
-            "physical_plausibility": self._compress_high_tail(physical_plausibility, knee=68.0, scale=0.45),
-            "composition_aesthetics": self._compress_high_tail(composition_aesthetics, knee=70.0, scale=0.60),
+            "visual_fidelity": float(max(0.0, min(100.0, visual_fidelity))),
+            "text_consistency": float(max(0.0, min(100.0, text_consistency))),
+            "physical_plausibility": float(max(0.0, min(100.0, physical_plausibility))),
+            "composition_aesthetics": float(max(0.0, min(100.0, composition_aesthetics))),
         }
         total_score = round(
             sum(calibrated[name] * weight for name, weight in self.COMPONENT_WEIGHTS.items()),
@@ -135,17 +135,3 @@ class ScoringService:
         ):
             if runtime is not None and hasattr(runtime, "unload"):
                 runtime.unload()
-
-    @staticmethod
-    def _compress_high_tail(score: float, *, knee: float, scale: float) -> float:
-        bounded = max(0.0, min(100.0, float(score)))
-        if bounded <= knee:
-            return round(bounded, 2)
-        return round(min(100.0, knee + (bounded - knee) * scale), 2)
-
-    @staticmethod
-    def _lift_low_band(score: float, *, target: float, gain: float) -> float:
-        bounded = max(0.0, min(100.0, float(score)))
-        if bounded >= target:
-            return round(bounded, 2)
-        return round(min(100.0, bounded + (target - bounded) * gain), 2)

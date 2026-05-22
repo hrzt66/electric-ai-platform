@@ -1,0 +1,96 @@
+{
+  "issues": [
+    {
+      "location": "第4章 4.3.1 附近（原段落约 289-291）",
+      "figure": "图4.7",
+      "status": "缺图 + 图题写错",
+      "note": "正文说的是“评分体系版本进化示意图”，但当前位置没有图片，图题却误写成“训练后验证样例拼图”。",
+      "suggested_file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.7_评分体系版本演进示意图.png"
+    },
+    {
+      "location": "第4章 4.3.2 附近（原段落约 294-296）",
+      "figure": "图4.8",
+      "status": "图题重复/错位",
+      "note": "这里正文说的是 electric-score-v2 回归误差结果，但当前图题仍写成“图4.7训练后验证样例拼图”。应改成回归误差图。",
+      "suggested_file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.8_electric-score-v2回归误差图.png"
+    },
+    {
+      "location": "第4章 4.3.3 附近（原段落约 305-320）",
+      "figure": "YOLO相关",
+      "status": "建议替换为最新版本",
+      "note": "当前文内已有YOLO图，但建议换成最新选用的 0.68 版本曲线。由于前面 4.7/4.8 补入后，后续编号需要顺延。",
+      "suggested_files": [
+        "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.9_YOLO辅助检测指标_最新.png",
+        "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.10_YOLO辅助检测训练损失曲线_最新.png",
+        "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/附加_YOLO辅助检测学习率曲线_最新.png",
+        "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/附加_YOLO辅助检测训练进度与吞吐率图_最新.png"
+      ]
+    },
+    {
+      "location": "第5章 5.4.3 附近（原段落约 409-412）",
+      "figure": "图5.10",
+      "status": "缺图",
+      "note": "图题存在，但前面没有任何图片。",
+      "suggested_file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图5.10_固定Prompt集逐Prompt走势统计.png"
+    },
+    {
+      "location": "第5章 5.4.4 附近（原段落约 414-416）",
+      "figure": "图5.11",
+      "status": "缺图",
+      "note": "图题存在，但前面没有任何图片。",
+      "suggested_file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图5.11_固定Prompt集样例拼图.png"
+    },
+    {
+      "location": "第5章 5.4.5",
+      "figure": "可选新增图",
+      "status": "本节无图题",
+      "note": "这一节专门讲 YOLO 辅助检测训练曲线与行业约束能力，如果你想让论证更完整，可以在这里新增一张最新 YOLO 指标图或损失曲线，编号顺延。",
+      "suggested_files": [
+        "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.9_YOLO辅助检测指标_最新.png",
+        "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.10_YOLO辅助检测训练损失曲线_最新.png"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.10_YOLO辅助检测训练损失曲线_最新.png",
+      "width": 2287,
+      "height": 1166
+    },
+    {
+      "file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.7_评分体系版本演进示意图.png",
+      "width": 2617,
+      "height": 1077
+    },
+    {
+      "file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.8_electric-score-v2回归误差图.png",
+      "width": 2397,
+      "height": 1165
+    },
+    {
+      "file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图4.9_YOLO辅助检测指标_最新.png",
+      "width": 2287,
+      "height": 1166
+    },
+    {
+      "file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图5.10_固定Prompt集逐Prompt走势统计.png",
+      "width": 2353,
+      "height": 1209
+    },
+    {
+      "file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/图5.11_固定Prompt集样例拼图.png",
+      "width": 2313,
+      "height": 5132
+    },
+    {
+      "file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/附加_YOLO辅助检测学习率曲线_最新.png",
+      "width": 2287,
+      "height": 1166
+    },
+    {
+      "file": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/thesis-refresh-20260427/附加_YOLO辅助检测训练进度与吞吐率图_最新.png",
+      "width": 2288,
+      "height": 1175
+    }
+  ]
+}

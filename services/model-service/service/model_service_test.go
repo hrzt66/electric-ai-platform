@@ -124,3 +124,15 @@ func TestHydrateStatusMarksLegacyElectricScoreUnavailableWhenDependenciesMissing
 		t.Fatalf("expected legacy electric-score-v1 to become unavailable, got %+v", item)
 	}
 }
+
+func TestHydrateStatusKeepsApiRuntimeAvailableWithoutLocalFiles(t *testing.T) {
+	item := hydrateStatus(RegistryModel{
+		ModelName: "gpt-image-2",
+		Status:    "available",
+		LocalPath: "api/openai/gpt-image-2",
+	})
+
+	if item.Status != "available" {
+		t.Fatalf("expected api runtime to stay available without local files, got %+v", item)
+	}
+}

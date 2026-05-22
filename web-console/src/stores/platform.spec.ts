@@ -12,9 +12,17 @@ const api = vi.hoisted(() => ({
   listTasks: vi.fn(),
   getAssetDetail: vi.fn(),
   listTaskAuditEvents: vi.fn(),
+  getMonitorOverview: vi.fn(),
+  getMonitorStreamUrl: vi.fn(),
 }))
 
 vi.mock('../api/platform', () => api)
+
+const sse = vi.hoisted(() => ({
+  streamSse: vi.fn(),
+}))
+
+vi.mock('../utils/sse', () => sse)
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void
@@ -435,5 +443,131 @@ describe('platform store', () => {
     await store.refreshTask(21)
 
     expect(store.currentTaskAudit).toEqual([])
+  })
+
+  it('preserves existing monitor fields when the SSE stream sends a partial snapshot', async () => {
+    const { usePlatformStore } = await import('./platform')
+    const store = usePlatformStore()
+
+    api.getMonitorOverview.mockResolvedValue({
+      overall_health: 'warning',
+      host_snapshot: {
+        platform_family: 'macos',
+        cpu_usage_percent: 41,
+        memory_total_bytes: 16000000000,
+        memory_used_bytes: 8000000000,
+      },
+      accelerator_snapshot: {
+        accelerator_type: 'apple-mps',
+        gpu_utilization_percent: 61,
+      },
+      service_snapshots: [{ service_name: 'python-ai-service', status: 'running' }],
+      task_runtime_context: { active_task_count: 2, latest_task_stage: 'generating' },
+      active_alerts: [{ alert_id: 'a1', level: 'warning', title: '推理延迟偏高' }],
+      recent_alerts: [],
+    })
+    api.getMonitorStreamUrl.mockReturnValue('/api/v1/monitor/stream')
+    sse.streamSse.mockImplementation(async (_url: string, options?: { onOpen?: () => void; onMessage?: (message: { event: string; data: string }) => void }) => {
+      options?.onOpen?.()
+      options?.onMessage?.({
+        event: 'snapshot',
+        data: JSON.stringify({
+          overall_health: 'healthy',
+        }),
+      })
+    })
+
+    await store.fetchMonitorOverview()
+    store.startMonitorStream()
+    await Promise.resolve()
+
+    expect(store.monitorConnected).toBe(true)
+    expect(store.monitorOverview?.overall_health).toBe('healthy')
+    expect(store.monitorOverview?.host_snapshot?.platform_family).toBe('macos')
+    expect(store.monitorOverview?.host_snapshot?.cpu_usage_percent).toBe(41)
+    expect(store.monitorOverview?.service_snapshots).toEqual([{ service_name: 'python-ai-service', status: 'running' }])
+    expect(store.monitorOverview?.task_runtime_context).toEqual({ active_task_count: 2, latest_task_stage: 'generating' })
+    expect(store.monitorOverview?.active_alerts).toEqual([{ alert_id: 'a1', level: 'warning', title: '推理延迟偏高' }])
+    expect(store.monitorHistory).toHaveLength(2)
+    expect(store.monitorHistory[0]?.overview.overall_health).toBe('warning')
+    expect(store.monitorHistory[1]?.overview.overall_health).toBe('healthy')
+  })
+
+  it('caps monitor history to the latest 60 snapshots', async () => {
+    const { usePlatformStore } = await import('./platform')
+    const store = usePlatformStore()
+
+    for (let idx = 0; idx < 65; idx += 1) {
+      store.applyMonitorSnapshot({
+        overall_health: idx % 2 === 0 ? 'healthy' : 'warning',
+        host_snapshot: {
+          platform_family: 'macos',
+          cpu_usage_percent: idx,
+        },
+        accelerator_snapshot: null,
+        service_snapshots: [],
+        task_runtime_context: { active_task_count: idx },
+        active_alerts: [],
+        recent_alerts: [],
+      })
+    }
+
+    expect(store.monitorHistory).toHaveLength(60)
+    expect(store.monitorHistory[0]?.overview.host_snapshot.cpu_usage_percent).toBe(5)
+    expect(store.monitorHistory[59]?.overview.host_snapshot.cpu_usage_percent).toBe(64)
+    expect(store.monitorOverview?.host_snapshot.cpu_usage_percent).toBe(64)
+  })
+
+  it('keeps the latest monitor frame when SSE disconnects', async () => {
+    const { usePlatformStore } = await import('./platform')
+    const store = usePlatformStore()
+
+    api.getMonitorOverview.mockResolvedValue({
+      overall_health: 'healthy',
+      host_snapshot: {
+        platform_family: 'macos',
+        cpu_usage_percent: 10,
+      },
+      accelerator_snapshot: null,
+      service_snapshots: [],
+      task_runtime_context: { active_task_count: 0 },
+      active_alerts: [],
+      recent_alerts: [],
+    })
+    api.getMonitorStreamUrl.mockReturnValue('/api/v1/monitor/stream')
+    sse.streamSse.mockImplementation(
+      async (
+        _url: string,
+        options?: {
+          onOpen?: () => void
+          onError?: (error: unknown) => void
+          onMessage?: (message: { event: string; data: string }) => void
+        },
+      ) => {
+        options?.onOpen?.()
+        options?.onMessage?.({
+          event: 'overview',
+          data: JSON.stringify({
+            overall_health: 'critical',
+            host_snapshot: {
+              platform_family: 'macos',
+              cpu_usage_percent: 88,
+            },
+          }),
+        })
+        options?.onError?.(new Error('stream dropped'))
+        throw new Error('stream dropped')
+      },
+    )
+
+    await store.fetchMonitorOverview()
+    store.startMonitorStream()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(store.monitorConnected).toBe(false)
+    expect(store.monitorOverview?.overall_health).toBe('critical')
+    expect(store.monitorOverview?.host_snapshot.cpu_usage_percent).toBe(88)
+    expect(store.monitorHistory.at(-1)?.overview.host_snapshot.cpu_usage_percent).toBe(88)
   })
 })

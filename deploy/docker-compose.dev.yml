@@ -108,6 +108,17 @@ services:
     expose:
       - "8085"
 
+  monitor-service:
+    build:
+      context: ..
+      dockerfile: deploy/docker/monitor-service.Dockerfile
+    environment:
+      APP_NAME: monitor-service
+      HTTP_PORT: 8086
+      JWT_SECRET: electric-ai-secret
+    expose:
+      - "8086"
+
   gateway-service:
     build:
       context: ..
@@ -119,12 +130,21 @@ services:
       AUTH_SERVICE_URL: http://auth-service:8081
       MODEL_SERVICE_URL: http://model-service:8082
       TASK_SERVICE_URL: http://task-service:8083
+      ASSET_SERVICE_URL: http://asset-service:8084
+      AUDIT_SERVICE_URL: http://audit-service:8085
+      MONITOR_SERVICE_URL: http://monitor-service:8086
     depends_on:
       auth-service:
         condition: service_started
       model-service:
         condition: service_started
       task-service:
+        condition: service_started
+      asset-service:
+        condition: service_started
+      audit-service:
+        condition: service_started
+      monitor-service:
         condition: service_started
     ports:
       - "8080:8080"

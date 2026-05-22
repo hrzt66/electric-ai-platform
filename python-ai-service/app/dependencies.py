@@ -9,6 +9,7 @@ from app.core.settings import Settings, get_settings
 from app.runtimes.runtime_registry import RuntimeRegistry
 from app.runtimes.scorers.aesthetic_runtime import AestheticRuntime
 from app.runtimes.scorers.clip_iqa_runtime import ClipIQARuntime
+from app.runtimes.scorers.gpt_physical_runtime import GPTPhysicalRuntime
 from app.runtimes.scorers.image_reward_runtime import ImageRewardRuntime
 from app.runtimes.scorers.power_score_runtime import PowerScoreRouter, PowerScoreRuntime
 from app.services.generation_service import GenerationService
@@ -42,6 +43,9 @@ def build_scoring_service(
                 "electric-score-v2": PowerScoreRuntime(
                     runtime_settings.scoring_model_dir / "electric-score-v2",
                     image_check_dir=runtime_settings.output_image_check_dir,
+                    physical_gpt_runtime=GPTPhysicalRuntime(
+                        output_dir=runtime_settings.output_image_check_dir / "physical_gpt_annotations",
+                    ),
                 ),
             }
         ),

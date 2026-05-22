@@ -3,6 +3,8 @@ import { defineStore } from 'pinia'
 import {
   createGenerateTask,
   getAssetDetail,
+  getMonitorOverview,
+  getMonitorStreamUrl,
   getTask,
   listAssetHistory,
   listAssetHistoryPage,
@@ -11,6 +13,7 @@ import {
   listTasks,
 } from '../api/platform'
 import { localizeModelRecords } from '../model-copy'
+import { streamSse } from '../utils/sse'
 import type {
   AssetDetail,
   AssetHistoryPage,
@@ -20,9 +23,13 @@ import type {
   GenerateTask,
   GenerateTaskRequest,
   ModelRecord,
+  MonitorHistoryPoint,
+  MonitorOverview,
 } from '../types/platform'
+import { useAuthStore } from './auth'
 
 const CACHE_TTL_MS = 5_000
+const MONITOR_HISTORY_LIMIT = 60
 
 function isCacheFresh(timestamp: number, ttl = CACHE_TTL_MS) {
   // 判断缓存是否仍在有效期内，避免页面反复切换时重复打网关。
@@ -73,6 +80,49 @@ function extractErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+function normalizeMonitorOverview(overview: MonitorOverview): MonitorOverview {
+  return {
+    ...overview,
+    service_snapshots: ensureArray(overview.service_snapshots),
+    active_alerts: ensureArray(overview.active_alerts),
+    recent_alerts: ensureArray(overview.recent_alerts),
+    task_runtime_context: overview.task_runtime_context ?? {
+      active_task_count: 0,
+    },
+  }
+}
+
+function mergeMonitorOverview(
+  current: MonitorOverview | null,
+  incoming: Partial<MonitorOverview> | MonitorOverview,
+): MonitorOverview {
+  const base = current ?? {
+    overall_health: 'healthy',
+    host_snapshot: {
+      platform_family: 'unknown',
+      cpu_usage_percent: 0,
+    },
+    service_snapshots: [],
+    task_runtime_context: {
+      active_task_count: 0,
+    },
+    active_alerts: [],
+    recent_alerts: [],
+  }
+
+  return normalizeMonitorOverview({
+    ...base,
+    ...incoming,
+    host_snapshot: incoming.host_snapshot ?? base.host_snapshot,
+    accelerator_snapshot:
+      incoming.accelerator_snapshot === undefined ? base.accelerator_snapshot : incoming.accelerator_snapshot,
+    service_snapshots: incoming.service_snapshots ?? base.service_snapshots,
+    task_runtime_context: incoming.task_runtime_context ?? base.task_runtime_context,
+    active_alerts: incoming.active_alerts ?? base.active_alerts,
+    recent_alerts: incoming.recent_alerts ?? base.recent_alerts,
+  })
+}
+
 type PlatformState = {
   models: ModelRecord[]
   tasks: GenerateTask[]
@@ -105,6 +155,13 @@ type PlatformState = {
   modelsRequest: Promise<ModelRecord[]> | null
   taskRequests: Record<number, Promise<GenerateTask>>
   historyPageRequestToken: number
+
+  monitorOverview: MonitorOverview | null
+  monitorHistory: MonitorHistoryPoint[]
+  monitorConnected: boolean
+  monitorLoadError: string | null
+  loadingMonitor: boolean
+  monitorStreamController: AbortController | null
 }
 
 export const usePlatformStore = defineStore('platform', {
@@ -140,6 +197,13 @@ export const usePlatformStore = defineStore('platform', {
     modelsRequest: null,
     taskRequests: {},
     historyPageRequestToken: 0,
+
+    monitorOverview: null,
+    monitorHistory: [],
+    monitorConnected: false,
+    monitorLoadError: null,
+    loadingMonitor: false,
+    monitorStreamController: null,
   }),
   getters: {
     currentTaskId(state) {
@@ -369,6 +433,79 @@ export const usePlatformStore = defineStore('platform', {
       // 查询当前选中资产的详情，用于历史中心右侧抽屉。
       this.selectedAssetDetail = await getAssetDetail(assetId)
       return this.selectedAssetDetail
+    },
+
+    async fetchMonitorOverview() {
+      this.loadingMonitor = true
+      this.monitorLoadError = null
+      try {
+        this.applyMonitorSnapshot(await getMonitorOverview())
+        return this.monitorOverview
+      } catch (error) {
+        this.monitorLoadError = extractErrorMessage(error, '运行监控加载失败')
+        throw error
+      } finally {
+        this.loadingMonitor = false
+      }
+    },
+
+    startMonitorStream() {
+      this.stopMonitorStream()
+
+      const controller = new AbortController()
+      this.monitorStreamController = controller
+      this.monitorConnected = false
+
+      const authStore = useAuthStore()
+      authStore.hydrate()
+      const authHeader = authStore.accessToken ? `Bearer ${authStore.accessToken}` : ''
+
+      void streamSse(getMonitorStreamUrl(), {
+        signal: controller.signal,
+        headers: authHeader ? { Authorization: authHeader } : undefined,
+        onOpen: () => {
+          this.monitorConnected = true
+        },
+        onError: () => {
+          this.monitorConnected = false
+        },
+        onMessage: (message) => {
+          this.monitorConnected = true
+
+          if (message.event === 'overview' || message.event === 'snapshot' || message.event === 'message') {
+            try {
+              this.applyMonitorSnapshot(JSON.parse(message.data) as Partial<MonitorOverview>)
+            } catch {
+              // ignore malformed overview payload
+            }
+          }
+        },
+      }).catch(() => {
+        if (this.monitorStreamController === controller) {
+          this.monitorConnected = false
+          this.monitorStreamController = null
+        }
+      })
+    },
+
+    stopMonitorStream() {
+      if (this.monitorStreamController) {
+        this.monitorStreamController.abort()
+        this.monitorStreamController = null
+      }
+      this.monitorConnected = false
+    },
+
+    applyMonitorSnapshot(incoming: Partial<MonitorOverview> | MonitorOverview) {
+      this.monitorOverview = mergeMonitorOverview(this.monitorOverview, incoming)
+      this.monitorHistory.push({
+        recorded_at: Date.now(),
+        overview: this.monitorOverview,
+      })
+      if (this.monitorHistory.length > MONITOR_HISTORY_LIMIT) {
+        this.monitorHistory.splice(0, this.monitorHistory.length - MONITOR_HISTORY_LIMIT)
+      }
+      return this.monitorOverview
     },
   },
 })

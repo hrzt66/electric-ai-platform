@@ -215,3 +215,38 @@ def test_runtime_registry_lists_specialized_sd15_model(tmp_path):
 
     assert specialized["status"] == "available"
     assert Path(specialized["local_dir"]) == generation_dir
+
+
+def test_runtime_registry_builds_gpt_image2_runtime_from_settings(tmp_path):
+    from app.core.settings import Settings
+    from app.runtimes.openai_image_runtime import OpenAIImageRuntime
+    from app.runtimes.runtime_registry import RuntimeRegistry
+
+    settings = Settings(
+        runtime_root=tmp_path,
+        openai_api_key="test-key",
+        openai_base_url="https://geekspace.cloud/v1",
+        openai_image_model="gpt-image-2",
+    )
+    registry = RuntimeRegistry(settings=settings)
+
+    runtime = registry.get_generation_runtime("gpt-image-2")
+
+    assert isinstance(runtime, OpenAIImageRuntime)
+    assert runtime.output_dir == tmp_path / "image"
+    assert runtime.image_model == "gpt-image-2"
+
+
+def test_runtime_registry_lists_gpt_image2_as_available_api_runtime(tmp_path):
+    from app.core.settings import Settings
+    from app.runtimes.runtime_registry import RuntimeRegistry
+
+    settings = Settings(runtime_root=tmp_path)
+    registry = RuntimeRegistry(settings=settings)
+
+    items = registry.list_models()["items"]
+    image2 = next(item for item in items if item["name"] == "gpt-image-2")
+
+    assert image2["status"] == "available"
+    assert image2["ready"] is True
+    assert image2["source"] == "api-runtime"

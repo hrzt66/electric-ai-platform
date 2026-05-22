@@ -1,0 +1,26 @@
+[
+  {
+    "caption": "图2-1 Stable Diffusion 结构与生成流程图",
+    "mmd": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/01-图2-1-Stable-Diffusion-结构与生成流程图.mmd",
+    "png": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/01-图2-1-Stable-Diffusion-结构与生成流程图.png",
+    "svg": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/01-图2-1-Stable-Diffusion-结构与生成流程图.svg"
+  },
+  {
+    "caption": "图2-3 平台前后端与 AI 运行时协同流程图",
+    "mmd": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/02-图2-3-平台前后端与-AI-运行时协同流程图.mmd",
+    "png": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/02-图2-3-平台前后端与-AI-运行时协同流程图.png",
+    "svg": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/02-图2-3-平台前后端与-AI-运行时协同流程图.svg"
+  },
+  {
+    "caption": "图3-1 系统总体架构图",
+    "mmd": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/03-图3-1-系统总体架构图.mmd",
+    "png": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/03-图3-1-系统总体架构图.png",
+    "svg": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/03-图3-1-系统总体架构图.svg"
+  },
+  {
+    "caption": "图3-2 系统数据库 E-R 图",
+    "mmd": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/04-图3-2-系统数据库-E-R-图.mmd",
+    "png": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/04-图3-2-系统数据库-E-R-图.png",
+    "svg": "/Users/hrzt/code/vibe coding/codex/毕业设计/electric-ai-platform/docs/image/mermaid/04-图3-2-系统数据库-E-R-图.svg"
+  }
+]

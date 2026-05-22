@@ -128,7 +128,6 @@ def test_prepare_yolo_training_dataset_remaps_legacy_component_labels_to_supercl
                 "  - bus",
                 "  - tower",
                 "  - insulator",
-                "  - hardhat",
             ]
         ),
         encoding="utf-8",
@@ -141,7 +140,6 @@ def test_prepare_yolo_training_dataset_remaps_legacy_component_labels_to_supercl
             "substation_primary",
             "transmission_tower",
             "insulator_string",
-            "maintenance_ppe",
         ],
     )
 
@@ -150,7 +148,6 @@ def test_prepare_yolo_training_dataset_remaps_legacy_component_labels_to_supercl
         "substation_primary",
         "transmission_tower",
         "insulator_string",
-        "maintenance_ppe",
     ]
 
     label_text = (merged_yaml.parent / "labels" / "train" / "0_train.txt").read_text(encoding="utf-8").splitlines()
@@ -158,5 +155,4 @@ def test_prepare_yolo_training_dataset_remaps_legacy_component_labels_to_supercl
         "0 0.500000 0.500000 0.250000 0.250000",
         "1 0.400000 0.400000 0.200000 0.200000",
         "2 0.600000 0.600000 0.200000 0.200000",
-        "3 0.700000 0.700000 0.150000 0.150000",
     ]

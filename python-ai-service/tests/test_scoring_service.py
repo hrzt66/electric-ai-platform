@@ -142,11 +142,14 @@ def test_scoring_service_rebalances_industrial_scores():
         composition_aesthetics=63.47,
     )
 
-    assert result["visual_fidelity"] < 90.0
-    assert result["text_consistency"] > 39.52
-    assert result["physical_plausibility"] < 75.65
-    assert result["composition_aesthetics"] <= 63.47
-    assert result["total_score"] < 69.07
+    assert result["visual_fidelity"] == 99.98
+    assert result["text_consistency"] == 39.52
+    assert result["physical_plausibility"] == 75.65
+    assert result["composition_aesthetics"] == 63.47
+    assert result["total_score"] == round(
+        99.98 * 0.21 + 39.52 * 0.37 + 75.65 * 0.24 + 63.47 * 0.18,
+        2,
+    )
 
 
 def test_scoring_service_releases_runtimes_after_batch_when_enabled(tmp_path):

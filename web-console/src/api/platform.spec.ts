@@ -9,7 +9,7 @@ const api = vi.hoisted(() => ({
 
 vi.mock('./http', () => api)
 
-import { buildImageUrl, listAssetHistoryPage } from './platform'
+import { buildImageUrl, getMonitorOverview, listAssetHistoryPage } from './platform'
 
 describe('buildImageUrl', () => {
   it('routes checked images to the dedicated image-check static path', () => {
@@ -54,5 +54,27 @@ describe('listAssetHistoryPage', () => {
         min_total_score: 60,
       },
     })
+  })
+})
+
+describe('getMonitorOverview', () => {
+  it('requests the monitor overview endpoint', async () => {
+    api.http.get.mockResolvedValue({
+      data: {
+        data: {
+          overall_health: 'healthy',
+          host_snapshot: { os: 'darwin', arch: 'arm64', hostname: 'local' },
+          accelerator_snapshot: null,
+          service_snapshots: [],
+          task_runtime_context: null,
+          active_alerts: [],
+          recent_alerts: [],
+        },
+      },
+    })
+
+    await getMonitorOverview()
+
+    expect(api.http.get).toHaveBeenCalledWith('/monitor/overview')
   })
 })

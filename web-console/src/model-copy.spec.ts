@@ -36,4 +36,18 @@ describe('model copy localization', () => {
 
     expect(localizeModelRecord(original)).toEqual(original)
   })
+
+  it('localizes gpt-image-2 as an API generation model', () => {
+    const localized = localizeModelRecord(
+      buildModelRecord({
+        model_name: 'gpt-image-2',
+        display_name: 'GPT Image 2',
+        description: 'OpenAI-compatible Image 2 API generation runtime',
+        local_path: 'api/openai/gpt-image-2',
+      }),
+    )
+
+    expect(localized.display_name).toBe('GPT Image 2 电力云生图')
+    expect(localized.description).toContain('OpenAI 兼容')
+  })
 })

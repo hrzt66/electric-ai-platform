@@ -100,6 +100,13 @@ def get_model_manifest(settings: Settings | None = None) -> dict[str, dict[str, 
             local_dir=str(paths.models_generation / "unipic2-kontext"),
             description="UniPic2 electric scene runtime",
         ),
+        "gpt-image-2": RuntimeModelManifestEntry(
+            name="gpt-image-2",
+            target="generation",
+            source="api-runtime",
+            local_dir=str(paths.models_generation / "gpt-image-2"),
+            description="OpenAI-compatible Image 2 API generation runtime",
+        ),
         "image-reward": RuntimeModelManifestEntry(
             name="image-reward",
             target="scoring",
@@ -230,6 +237,14 @@ def execute_download_plan(selected_models: list[str], check_only: bool = False) 
         if entry["source"] == "local-runtime":
             results[model_name] = {
                 "status": "present" if local_dir.exists() and any(local_dir.iterdir()) else "missing",
+                "local_dir": str(local_dir),
+            }
+            continue
+
+        if entry["source"] == "api-runtime":
+            results[model_name] = {
+                "status": "available",
+                "source": "api-runtime",
                 "local_dir": str(local_dir),
             }
             continue

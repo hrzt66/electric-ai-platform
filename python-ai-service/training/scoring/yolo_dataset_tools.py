@@ -10,21 +10,34 @@ from pathlib import Path
 import yaml
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
+DEFAULT_SCORING_TARGET_CLASSES = [
+    "substation_primary",
+    "transmission_tower",
+    "insulator_string",
+    "wind_turbine",
+    "solar_panel",
+    "dam",
+]
+DEFAULT_IMAGE2_TO_SCORING_CLASS_MAPPING = {
+    "photovoltaic_farm": "solar_panel",
+    "transmission_tower": "transmission_tower",
+    "wind_turbine": "wind_turbine",
+    "dam": "dam",
+    "substation": "substation_primary",
+}
 MANIFEST_SOURCE_NAME_BY_PREFIX = {
     "0": "substation-object-detection-yolo",
     "1": "powerline-components-and-faults",
     "2": "dior-superclasses",
-    "3": "ppe-detection",
-    "4": "wind-turbine-aerial",
-    "5": "solar-plants-brazil-yolo",
+    "3": "wind-turbine-aerial",
+    "4": "solar-plants-brazil-yolo",
 }
 EXACT_SOURCE_NAME_BY_PREFIX = {
     "0": "substation-object-detection",
     "1": "powerline-components-and-faults",
     "2": "dior-superclasses",
-    "3": "ppe-detection",
-    "4": "wind-turbine-aerial",
-    "5": "solar-plants-brazil-yolo",
+    "3": "wind-turbine-aerial",
+    "4": "solar-plants-brazil-yolo",
 }
 
 
@@ -216,6 +229,169 @@ def rebuild_yolo_merged_artifacts(training_root: Path) -> dict[str, object]:
         "manifest_rows": len(manifest_rows),
         "exact_rows": len(exact_rows),
     }
+
+
+def import_yolo_dataset_with_class_mapping(
+    *,
+    source_yaml: Path,
+    target_root: Path,
+    source_tag: str,
+    target_classes: list[str],
+    class_mapping: dict[str, str],
+) -> dict[str, object]:
+    source_payload = yaml.safe_load(source_yaml.read_text(encoding="utf-8")) or {}
+    source_root = Path(source_payload.get("path") or source_yaml.resolve().parent)
+    if not source_root.is_absolute():
+        source_root = (source_yaml.resolve().parent / source_root).resolve()
+    source_class_names = _read_active_classes(source_yaml)
+    target_class_ids = {class_name: index for index, class_name in enumerate(target_classes)}
+    source_to_target_ids: dict[int, int] = {}
+    for source_index, source_name in enumerate(source_class_names):
+        mapped_name = class_mapping.get(source_name)
+        if mapped_name is None or mapped_name not in target_class_ids:
+            continue
+        source_to_target_ids[source_index] = target_class_ids[mapped_name]
+
+    if target_root.exists():
+        shutil.rmtree(target_root)
+    for split in ("train", "val", "test"):
+        (target_root / "images" / split).mkdir(parents=True, exist_ok=True)
+        (target_root / "labels" / split).mkdir(parents=True, exist_ok=True)
+
+    report = {
+        "source_yaml": str(source_yaml.resolve()),
+        "source_root": str(source_root),
+        "target_root": str(target_root),
+        "source_tag": source_tag,
+        "target_classes": list(target_classes),
+        "copied_images": 0,
+        "dropped_images": 0,
+        "kept_boxes": 0,
+        "dropped_boxes": 0,
+        "mapped_counts_by_target": {},
+    }
+    mapped_counts_by_target: dict[str, int] = defaultdict(int)
+
+    for split in ("train", "val", "test"):
+        image_dir = source_root / "images" / split
+        if not image_dir.exists():
+            continue
+
+        for image_path in sorted(image_dir.iterdir()):
+            if not image_path.is_file():
+                continue
+            if image_path.suffix.lower() not in IMAGE_SUFFIXES:
+                continue
+
+            label_path = source_root / "labels" / split / f"{image_path.stem}.txt"
+            if not label_path.exists():
+                continue
+
+            kept_lines: list[str] = []
+            for raw_line in label_path.read_text(encoding="utf-8").splitlines():
+                cleaned_line, _ = canonicalize_yolo_label_line(raw_line)
+                if cleaned_line is None:
+                    report["dropped_boxes"] += 1
+                    continue
+
+                parts = cleaned_line.split()
+                source_class_id = int(parts[0])
+                target_class_id = source_to_target_ids.get(source_class_id)
+                if target_class_id is None:
+                    report["dropped_boxes"] += 1
+                    continue
+
+                target_class_name = target_classes[target_class_id]
+                mapped_counts_by_target[target_class_name] += 1
+                kept_lines.append(" ".join([str(target_class_id), *parts[1:]]))
+                report["kept_boxes"] += 1
+
+            if not kept_lines:
+                report["dropped_images"] += 1
+                continue
+
+            target_stem = f"{source_tag}_{image_path.stem}"
+            target_image_path = target_root / "images" / split / f"{target_stem}{image_path.suffix.lower()}"
+            target_label_path = target_root / "labels" / split / f"{target_stem}.txt"
+            shutil.copy2(image_path, target_image_path)
+            target_label_path.write_text("\n".join(kept_lines), encoding="utf-8")
+            report["copied_images"] += 1
+
+    dataset_yaml = target_root / "dataset.yaml"
+    dataset_yaml.write_text(
+        "\n".join(
+            [
+                f"path: {target_root}",
+                "train: images/train",
+                "val: images/val",
+                "test: images/test",
+                "names:",
+                *[f"  - {class_name}" for class_name in target_classes],
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report["mapped_counts_by_target"] = dict(sorted(mapped_counts_by_target.items()))
+    (target_root / "import_summary.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return report
+
+
+def import_external_image2_yolo_run_for_scoring(
+    *,
+    source_run_dir: Path,
+    target_roots: list[Path],
+    bundle_dir: Path,
+    target_classes: list[str] | None = None,
+    class_mapping: dict[str, str] | None = None,
+) -> dict[str, object]:
+    resolved_source_run_dir = source_run_dir.resolve()
+    source_yaml = resolved_source_run_dir / "dataset.yaml"
+    best_weight_path = resolved_source_run_dir / "best.pt"
+
+    if not source_yaml.exists():
+        raise FileNotFoundError(f"missing dataset.yaml under external YOLO run: {source_yaml}")
+    if not best_weight_path.exists():
+        raise FileNotFoundError(f"missing best.pt under external YOLO run: {best_weight_path}")
+
+    source_payload = yaml.safe_load(source_yaml.read_text(encoding="utf-8")) or {}
+    source_dataset_root = Path(source_payload.get("path") or source_yaml.parent)
+    if not source_dataset_root.is_absolute():
+        source_dataset_root = (source_yaml.parent / source_dataset_root).resolve()
+
+    mapped_classes = list(target_classes or DEFAULT_SCORING_TARGET_CLASSES)
+    mapping_rules = dict(class_mapping or DEFAULT_IMAGE2_TO_SCORING_CLASS_MAPPING)
+    source_tag = resolved_source_run_dir.name
+
+    dataset_reports = [
+        import_yolo_dataset_with_class_mapping(
+            source_yaml=source_yaml,
+            target_root=target_root,
+            source_tag=source_tag,
+            target_classes=mapped_classes,
+            class_mapping=mapping_rules,
+        )
+        for target_root in target_roots
+    ]
+
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+    archived_weight_path = bundle_dir / f"yolo_aux.{source_tag}.pt"
+    active_weight_path = bundle_dir / "yolo_aux.pt"
+    shutil.copy2(best_weight_path, archived_weight_path)
+    shutil.copy2(best_weight_path, active_weight_path)
+
+    report = {
+        "source_run_dir": str(resolved_source_run_dir),
+        "source_dataset_yaml": str(source_yaml.resolve()),
+        "source_dataset_root": str(source_dataset_root),
+        "source_weight_path": str(best_weight_path.resolve()),
+        "archived_weight_path": str(archived_weight_path.resolve()),
+        "active_weight_path": str(active_weight_path.resolve()),
+        "target_classes": mapped_classes,
+        "class_mapping": mapping_rules,
+        "dataset_reports": dataset_reports,
+    }
+    return report
 
 
 def build_high_map_variant(

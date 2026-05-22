@@ -40,6 +40,8 @@ def test_download_manifest_contains_generation_and_scoring_entries():
     assert manifest["ssd1b-electric"]["repo_id"] == "segmind/SSD-1B"
     assert manifest["unipic2-kontext"]["target"] == "generation"
     assert manifest["unipic2-kontext"]["repo_id"] == "Skywork/UniPic2-SD3.5M-Kontext-2B"
+    assert manifest["gpt-image-2"]["target"] == "generation"
+    assert manifest["gpt-image-2"]["source"] == "api-runtime"
     assert manifest["image-reward"]["target"] == "scoring"
 
 
@@ -96,6 +98,22 @@ def test_download_models_script_check_runs_from_cli():
 
     assert result.returncode == 0
     assert '"sd15-electric"' in result.stdout
+
+
+def test_execute_download_plan_marks_api_runtime_available_without_download(tmp_path, monkeypatch):
+    from app.core.settings import get_settings
+    from scripts.download_models import execute_download_plan
+
+    monkeypatch.setenv("ELECTRIC_AI_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    get_settings.cache_clear()
+
+    result = execute_download_plan(selected_models=["gpt-image-2"], check_only=False)
+
+    assert result["results"]["gpt-image-2"] == {
+        "status": "available",
+        "source": "api-runtime",
+        "local_dir": str(tmp_path / "runtime" / "generation" / "gpt-image-2"),
+    }
 
 
 def test_download_huggingface_retries_after_chunk_error(tmp_path):

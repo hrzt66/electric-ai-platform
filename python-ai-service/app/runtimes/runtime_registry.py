@@ -11,6 +11,7 @@ from typing import Any, Callable
 from app.core.runtime_paths import RuntimePaths
 from app.core.runtime_logging import configure_runtime_logging
 from app.core.settings import Settings, get_settings
+from app.runtimes.openai_image_runtime import OpenAIImageRuntime
 from app.runtimes.sd15_runtime import SD15Runtime
 from app.runtimes.ssd1b_runtime import SSD1BRuntime
 from app.runtimes.unipic2_runtime import UniPic2Runtime
@@ -36,6 +37,7 @@ class RuntimeRegistry:
             "sd15-electric-specialized": self._build_sd15_specialized_runtime,
             "ssd1b-electric": self._build_ssd1b_runtime,
             "unipic2-kontext": self._build_unipic2_runtime,
+            "gpt-image-2": self._build_openai_image_runtime,
         }
         self._runtime_cache: dict[str, Any] = {}
         self._active_generation_model_name: str | None = None
@@ -76,13 +78,19 @@ class RuntimeRegistry:
         items: list[dict[str, Any]] = []
         for name, entry in manifest.items():
             local_dir = Path(entry["local_dir"])
+            is_api_runtime = entry["source"] == "api-runtime"
             has_files = local_dir.exists() and any(local_dir.iterdir())
             items.append(
                 {
                     **entry,
                     "name": name,
-                    "status": self._resolve_status(name=name, target=entry["target"], has_files=has_files),
-                    "ready": has_files,
+                    "status": self._resolve_status(
+                        name=name,
+                        target=entry["target"],
+                        source=entry["source"],
+                        has_files=has_files,
+                    ),
+                    "ready": is_api_runtime or has_files,
                 }
             )
         items.sort(key=lambda item: item["name"])
@@ -133,6 +141,15 @@ class RuntimeRegistry:
             offload_mode=self._settings.unipic2_offload_mode,
         )
 
+    def _build_openai_image_runtime(self) -> OpenAIImageRuntime:
+        """构造 OpenAI 兼容 Image 2 API 运行时实例。"""
+        return OpenAIImageRuntime(
+            output_dir=self._settings.output_image_dir,
+            api_key=self._settings.openai_api_key,
+            base_url=self._settings.openai_base_url,
+            image_model=self._settings.openai_image_model,
+        )
+
     def _release_generation_runtime(self, model_name: str) -> None:
         # 实际运行时对象遵循 unload 协议，由各模型实现负责清理 torch / diffusers 资源。
         runtime = self._runtime_cache.pop(model_name, None)
@@ -157,8 +174,10 @@ class RuntimeRegistry:
 
         return bool(torch.cuda.is_available())
 
-    def _resolve_status(self, *, name: str, target: str, has_files: bool) -> str:
+    def _resolve_status(self, *, name: str, target: str, source: str, has_files: bool) -> str:
         """根据本地目录内容和模型目标类型推导最终展示状态。"""
+        if source == "api-runtime":
+            return "available" if name in self._generation_runtime_factories else "experimental"
         if has_files:
             return "available"
         if target == "generation" and name not in self._generation_runtime_factories:

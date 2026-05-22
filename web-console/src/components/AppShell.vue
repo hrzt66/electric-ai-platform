@@ -15,6 +15,7 @@ const navItems = [
   { label: '生成工作台', path: '/generate', hint: 'Generate' },
   { label: '历史中心', path: '/history', hint: 'History' },
   { label: '模型中心', path: '/models', hint: 'Models' },
+  { label: '运行监控', path: '/monitor', hint: 'Monitor' },
   { label: '任务审计', path: '/tasks/audit', hint: 'Audit' },
 ]
 
@@ -97,19 +98,22 @@ function logout() {
 
 <style scoped>
 .shell {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
+  overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(211, 164, 73, 0.18), transparent 26%),
     linear-gradient(180deg, #0f1720 0%, #121923 30%, #edf2f7 30%, #edf2f7 100%);
 }
 
 .sidebar {
+  height: 100vh;
   padding: 22px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow-y: auto;
   background: rgba(8, 13, 20, 0.94);
   backdrop-filter: blur(14px);
   color: #f6f1e8;
@@ -230,8 +234,10 @@ function logout() {
 
 .content {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
 .topbar {
@@ -277,21 +283,31 @@ function logout() {
 
 .main {
   min-width: 0;
+  min-height: 0;
   padding: 0 16px 16px;
 }
 
 @media (max-width: 1100px) {
   .shell {
+    height: auto;
+    min-height: 100vh;
     grid-template-columns: 1fr;
+    overflow: visible;
     background: linear-gradient(180deg, #0f1720 0%, #121923 18%, #edf2f7 18%, #edf2f7 100%);
   }
 
   .sidebar {
+    height: auto;
     padding-bottom: 12px;
+    overflow: visible;
   }
 
   .nav {
     grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  }
+
+  .content {
+    overflow: visible;
   }
 
   .topbar {

@@ -41,6 +41,12 @@ async function loadDashboard() {
   } finally {
     dashboardLoading.value = false
   }
+
+  try {
+    await platformStore.fetchMonitorOverview?.()
+  } catch {
+    // 监控面板加载失败时，不阻塞首页主数据展示。
+  }
 }
 
 onMounted(() => {
@@ -59,10 +65,6 @@ onMounted(() => {
         <div>
           <p class="hero-eyebrow">平台概览</p>
           <h2 class="hero-title">{{ authStore.displayName || authStore.userName || '当前会话' }}</h2>
-          <p class="hero-text">
-            旧项目中的生成、评分、历史和模型视图已经迁回当前微服务架构。
-            这里聚合展示任务调度、模型可用性和资产沉淀情况，方便你快速判断平台是否处于可用状态。
-          </p>
         </div>
         <router-link class="hero-link" to="/generate">进入生成工作台</router-link>
       </section>

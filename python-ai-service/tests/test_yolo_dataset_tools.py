@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from PIL import Image
+import yaml
 
 
 def _write_image(path: Path) -> None:
@@ -197,18 +198,18 @@ def test_build_high_map_variant_rebalances_without_extreme_repeats(tmp_path: Pat
         (merged_root / "images" / split).mkdir(parents=True, exist_ok=True)
         (merged_root / "labels" / split).mkdir(parents=True, exist_ok=True)
 
-    ppe_image = merged_root / "images" / "train" / "0_ppe.jpg"
-    ppe_label = merged_root / "labels" / "train" / "0_ppe.txt"
+    solar_image = merged_root / "images" / "train" / "0_solar.jpg"
+    solar_label = merged_root / "labels" / "train" / "0_solar.txt"
     tower_image = merged_root / "images" / "train" / "1_tower.jpg"
     tower_label = merged_root / "labels" / "train" / "1_tower.txt"
     val_image = merged_root / "images" / "val" / "2_val.jpg"
     val_label = merged_root / "labels" / "val" / "2_val.txt"
-    _write_image(ppe_image)
+    _write_image(solar_image)
     _write_image(tower_image)
     _write_image(val_image)
-    ppe_label.write_text("6 0.500000 0.500000 0.300000 0.300000", encoding="utf-8")
+    solar_label.write_text("4 0.500000 0.500000 0.300000 0.300000", encoding="utf-8")
     tower_label.write_text("1 0.500000 0.500000 0.250000 0.250000", encoding="utf-8")
-    val_label.write_text("6 0.500000 0.500000 0.300000 0.300000", encoding="utf-8")
+    val_label.write_text("4 0.500000 0.500000 0.300000 0.300000", encoding="utf-8")
     (merged_root / "dataset.yaml").write_text(
         "\n".join(
             [
@@ -223,7 +224,6 @@ def test_build_high_map_variant_rebalances_without_extreme_repeats(tmp_path: Pat
                 "  - wind_turbine",
                 "  - solar_panel",
                 "  - dam",
-                "  - maintenance_ppe",
             ]
         ),
         encoding="utf-8",
@@ -233,7 +233,7 @@ def test_build_high_map_variant_rebalances_without_extreme_repeats(tmp_path: Pat
     report = build_high_map_variant(
         merged_root=merged_root,
         variant_root=variant_root,
-        max_repeat_by_class={"maintenance_ppe": 3, "solar_panel": 3, "dam": 2},
+        max_repeat_by_class={"solar_panel": 3, "dam": 2},
         min_box_area=0.01,
     )
 
@@ -241,6 +241,194 @@ def test_build_high_map_variant_rebalances_without_extreme_repeats(tmp_path: Pat
     assert report["original_train_image_count"] == 2
     assert report["train_image_count"] == 4
     assert report["val_image_count"] == 1
-    assert report["repeat_factors"]["maintenance_ppe"] <= 3
+    assert report["repeat_factors"]["solar_panel"] <= 3
     assert len(list((variant_root / "images" / "train").glob("*.jpg"))) == 4
     assert len(list((variant_root / "images" / "val").glob("*.jpg"))) == 1
+
+
+def test_import_yolo_dataset_with_class_mapping_rewrites_to_current_scoring_classes(tmp_path: Path) -> None:
+    from training.scoring.yolo_dataset_tools import import_yolo_dataset_with_class_mapping
+
+    source_root = tmp_path / "image2-source"
+    for split in ("train", "val", "test"):
+        (source_root / "images" / split).mkdir(parents=True, exist_ok=True)
+        (source_root / "labels" / split).mkdir(parents=True, exist_ok=True)
+
+    mapped_image = source_root / "images" / "train" / "mapped.png"
+    mapped_sidecar = source_root / "images" / "train" / "mapped.npy"
+    dropped_image = source_root / "images" / "train" / "dropped.png"
+    val_image = source_root / "images" / "val" / "val.png"
+    _write_image(mapped_image)
+    mapped_sidecar.write_bytes(b"npy-sidecar")
+    _write_image(dropped_image)
+    _write_image(val_image)
+
+    (source_root / "labels" / "train" / "mapped.txt").write_text(
+        "\n".join(
+            [
+                "0 0.5 0.5 0.2 0.2",
+                "1 0.4 0.4 0.2 0.2",
+                "3 0.6 0.6 0.2 0.2",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (source_root / "labels" / "train" / "dropped.txt").write_text(
+        "5 0.5 0.5 0.2 0.2",
+        encoding="utf-8",
+    )
+    (source_root / "labels" / "val" / "val.txt").write_text(
+        "4 0.5 0.5 0.2 0.2",
+        encoding="utf-8",
+    )
+
+    (source_root / "dataset.yaml").write_text(
+        "\n".join(
+            [
+                f"path: {source_root}",
+                "train: images/train",
+                "val: images/val",
+                "test: images/test",
+                "names:",
+                "  0: photovoltaic_farm",
+                "  1: transmission_tower",
+                "  2: wind_turbine",
+                "  3: dam",
+                "  4: substation",
+                "  5: thermal_power_plant",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    target_root = tmp_path / "remapped"
+    report = import_yolo_dataset_with_class_mapping(
+        source_yaml=source_root / "dataset.yaml",
+        target_root=target_root,
+        source_tag="image2",
+        target_classes=[
+            "substation_primary",
+            "transmission_tower",
+            "insulator_string",
+            "wind_turbine",
+            "solar_panel",
+            "dam",
+        ],
+        class_mapping={
+            "photovoltaic_farm": "solar_panel",
+            "transmission_tower": "transmission_tower",
+            "wind_turbine": "wind_turbine",
+            "dam": "dam",
+            "substation": "substation_primary",
+        },
+    )
+
+    payload = yaml.safe_load((target_root / "dataset.yaml").read_text(encoding="utf-8"))
+    assert payload["names"] == [
+        "substation_primary",
+        "transmission_tower",
+        "insulator_string",
+        "wind_turbine",
+        "solar_panel",
+        "dam",
+    ]
+    assert report["copied_images"] == 2
+    assert report["dropped_images"] == 1
+    assert report["kept_boxes"] == 4
+    assert report["dropped_boxes"] == 1
+    assert sorted(report["mapped_counts_by_target"].keys()) == [
+        "dam",
+        "solar_panel",
+        "substation_primary",
+        "transmission_tower",
+    ]
+
+    train_labels = sorted((target_root / "labels" / "train").glob("*.txt"))
+    val_labels = sorted((target_root / "labels" / "val").glob("*.txt"))
+    assert len(train_labels) == 1
+    assert len(val_labels) == 1
+    assert len(list((target_root / "images" / "train").glob("*.png"))) == 1
+    assert len(list((target_root / "images" / "train").glob("*.npy"))) == 0
+    assert train_labels[0].read_text(encoding="utf-8").splitlines() == [
+        "4 0.500000 0.500000 0.200000 0.200000",
+        "1 0.400000 0.400000 0.200000 0.200000",
+        "5 0.600000 0.600000 0.200000 0.200000",
+    ]
+    assert val_labels[0].read_text(encoding="utf-8").splitlines() == [
+        "0 0.500000 0.500000 0.200000 0.200000",
+    ]
+
+
+def test_import_external_image2_yolo_run_for_scoring_uses_dataset_yaml_path_and_copies_weight(tmp_path: Path) -> None:
+    from training.scoring.yolo_dataset_tools import import_external_image2_yolo_run_for_scoring
+
+    dataset_root = tmp_path / "external-image2-dataset"
+    for split in ("train", "val", "test"):
+        (dataset_root / "images" / split).mkdir(parents=True, exist_ok=True)
+        (dataset_root / "labels" / split).mkdir(parents=True, exist_ok=True)
+
+    source_image = dataset_root / "images" / "train" / "sample.png"
+    _write_image(source_image)
+    (dataset_root / "labels" / "train" / "sample.txt").write_text(
+        "\n".join(
+            [
+                "0 0.5 0.5 0.2 0.2",
+                "1 0.4 0.4 0.2 0.2",
+                "4 0.6 0.6 0.2 0.2",
+                "6 0.5 0.5 0.3 0.3",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    source_run_dir = tmp_path / "final_best_hqv2_hardcleanr2_yolo11s"
+    source_run_dir.mkdir(parents=True, exist_ok=True)
+    (source_run_dir / "best.pt").write_bytes(b"fake-best-weight")
+    (source_run_dir / "dataset.yaml").write_text(
+        "\n".join(
+            [
+                f"path: {dataset_root}",
+                "train: images/train",
+                "val: images/val",
+                "test: images/test",
+                "names:",
+                "  0: photovoltaic_farm",
+                "  1: transmission_tower",
+                "  2: wind_turbine",
+                "  3: dam",
+                "  4: substation",
+                "  5: thermal_power_plant",
+                "  6: nuclear_power_plant",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (source_run_dir / "args.yaml").write_text("model: yolo11s.pt\n", encoding="utf-8")
+    (source_run_dir / "results.csv").write_text("epoch,map50\n1,0.75\n", encoding="utf-8")
+
+    dataset_target = tmp_path / "datasets" / "yolo-image2-remapped-scoring-6class-v1"
+    training_target = tmp_path / "training" / "yolo-image2-remapped-scoring-6class-v1"
+    bundle_dir = tmp_path / "model" / "scoring" / "electric-score-v2"
+
+    report = import_external_image2_yolo_run_for_scoring(
+        source_run_dir=source_run_dir,
+        target_roots=[dataset_target, training_target],
+        bundle_dir=bundle_dir,
+    )
+
+    assert report["source_run_dir"] == str(source_run_dir.resolve())
+    assert report["source_dataset_root"] == str(dataset_root.resolve())
+    assert report["active_weight_path"] == str((bundle_dir / "yolo_aux.pt").resolve())
+    assert (bundle_dir / "yolo_aux.pt").read_bytes() == b"fake-best-weight"
+    assert (bundle_dir / "yolo_aux.final_best_hqv2_hardcleanr2_yolo11s.pt").read_bytes() == b"fake-best-weight"
+    assert len(report["dataset_reports"]) == 2
+    assert report["dataset_reports"][0]["copied_images"] == 1
+    assert report["dataset_reports"][0]["dropped_boxes"] == 1
+
+    train_label = dataset_target / "labels" / "train" / "final_best_hqv2_hardcleanr2_yolo11s_sample.txt"
+    assert train_label.exists()
+    assert train_label.read_text(encoding="utf-8").splitlines() == [
+        "4 0.500000 0.500000 0.200000 0.200000",
+        "1 0.400000 0.400000 0.200000 0.200000",
+        "0 0.600000 0.600000 0.200000 0.200000",
+    ]

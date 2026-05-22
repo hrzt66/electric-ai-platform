@@ -68,6 +68,7 @@ flowchart LR
     Gateway --> Task["task-service"]
     Gateway --> Asset["asset-service"]
     Gateway --> Audit["audit-service"]
+    Gateway --> Monitor["monitor-service"]
     Task --> Redis["Redis Stream"]
     Redis --> Worker["python-ai-service worker"]
     Worker --> Runtime["sd15-electric / unipic2-kontext"]
@@ -108,6 +109,8 @@ flowchart LR
   生成结果与评分结果落库、历史中心查询、详情查询。
 - `services/audit-service`
   任务事件审计、时间线查询、审计落库。
+- `services/monitor-service`
+  跨平台运行监控服务，采集宿主机与 AI 推理运行时状态，并通过 SSE 推送实时快照，Dashboard 会展示“AI 运行健康”面板。
 - `services/gateway-service`
   统一 HTTP 入口、鉴权转发、图片静态访问。
 

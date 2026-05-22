@@ -217,7 +217,7 @@ failed
 
 - 加载自训练 `FourDimScoreModel`
 - 使用 prompt 编码特征
-- 可选加载 YOLO 辅助检测模型
+- 可选加载 YOLO11 辅助检测模型
 - 根据检测结果生成图像检查图
 - 输出四个维度得分、总分和解释信息
 
@@ -545,7 +545,7 @@ python scripts/train_generation_v3.py
 2. 构建 train / val / test manifest
 3. 训练 YOLO 辅助模型
 4. 训练四维评分模型
-5. 导出 `bundle_config.json`、`vocab.json`、`student_best.pt`、`metrics.json`
+5. 导出 `bundle_config.json`、`vocab.json`、`student_best.pt`、`yolo_aux.pt`、`metrics.json`
 
 常用脚本：
 
@@ -560,6 +560,20 @@ python scripts/train_scoring_v3.py
 - `--device`
 - `--yolo-imgsz`
 - `--yolo-batch-size`
+
+当前默认辅助检测训练配置已经切到 YOLO11：
+
+- `model=yolo11s.pt`
+- `imgsz=640`
+- `batch=6`
+- `optimizer=AdamW`
+- `lr0=3e-4`
+- `warmup_epochs=3.0`
+
+注意：
+
+- `yolo_aux.pt` 不能只按“文件替换”理解，它需要和 `electric-score-v2` 的 `bundle_config.json`、`yolo_feature_dim` 以及评分模型训练时使用的类别集合保持一致。
+- 如果更换成不同类别体系的 YOLO11 权重，正确做法是重训并重新导出整套 `electric-score-v2` bundle，而不是单独覆盖 `yolo_aux.pt`。
 
 产物通常位于：
 

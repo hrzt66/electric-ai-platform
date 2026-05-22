@@ -18,3 +18,10 @@ model/
 runs/
 *.pt
 services/audit-service/cmd/server/server
+docs/image/
+docs/superpowers/plans/
+docs/superpowers/specs/
+docs/thesis/
+ppt/
+*.docx
+docs/project-function-reference.md

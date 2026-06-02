@@ -9,6 +9,7 @@ import {
   listAssetHistory,
   listAssetHistoryPage,
   listModels,
+  listTaskPage,
   listTaskAuditEvents,
   listTasks,
 } from '../api/platform'
@@ -25,6 +26,8 @@ import type {
   ModelRecord,
   MonitorHistoryPoint,
   MonitorOverview,
+  TaskAuditPageQuery,
+  TaskPageResult,
 } from '../types/platform'
 import { useAuthStore } from './auth'
 
@@ -51,6 +54,16 @@ function ensureHistoryPage(value: AssetHistoryPage | null | undefined): AssetHis
   }
 }
 
+function ensureTaskPage(value: TaskPageResult | null | undefined): TaskPageResult {
+  return {
+    items: ensureArray(value?.items),
+    page: typeof value?.page === 'number' && value.page > 0 ? value.page : 1,
+    page_size: typeof value?.page_size === 'number' && value.page_size > 0 ? value.page_size : 10,
+    total: typeof value?.total === 'number' && value.total >= 0 ? value.total : 0,
+    total_pages: typeof value?.total_pages === 'number' && value.total_pages >= 0 ? value.total_pages : 0,
+  }
+}
+
 function dedupeCurrentTaskAssets(items: AssetHistoryItem[]) {
   const seen = new Set<string>()
   return items.filter((item) => {
@@ -60,6 +73,22 @@ function dedupeCurrentTaskAssets(items: AssetHistoryItem[]) {
     }
     seen.add(key)
     return true
+  })
+}
+
+function toTimestamp(value: string) {
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+function sortTasksByUpdatedAtDesc(tasks: GenerateTask[]) {
+  return [...tasks].sort((left, right) => {
+    const updatedDiff = toTimestamp(right.updated_at) - toTimestamp(left.updated_at)
+    if (updatedDiff !== 0) {
+      return updatedDiff
+    }
+
+    return right.id - left.id
   })
 }
 
@@ -132,6 +161,11 @@ type PlatformState = {
   historyPageSize: number
   historyTotal: number
   historyTotalPages: number
+  taskAuditPageItems: GenerateTask[]
+  taskAuditPage: number
+  taskAuditPageSize: number
+  taskAuditTotal: number
+  taskAuditTotalPages: number
   currentTask: GenerateTask | null
   currentAssets: AssetHistoryItem[]
   currentTaskAudit: AuditEvent[]
@@ -140,11 +174,13 @@ type PlatformState = {
   loadingTasks: boolean
   loadingHistory: boolean
   loadingHistoryPage: boolean
+  loadingTaskAuditPage: boolean
   loadingModels: boolean
   loadingTask: boolean
   tasksLoadError: string | null
   historyLoadError: string | null
   historyPageLoadError: string | null
+  taskAuditPageLoadError: string | null
   modelsLoadError: string | null
   taskLoadError: string | null
   tasksLoadedAt: number
@@ -174,6 +210,11 @@ export const usePlatformStore = defineStore('platform', {
     historyPageSize: 10,
     historyTotal: 0,
     historyTotalPages: 0,
+    taskAuditPageItems: [],
+    taskAuditPage: 1,
+    taskAuditPageSize: 10,
+    taskAuditTotal: 0,
+    taskAuditTotalPages: 0,
     currentTask: null,
     currentAssets: [],
     currentTaskAudit: [],
@@ -182,11 +223,13 @@ export const usePlatformStore = defineStore('platform', {
     loadingTasks: false,
     loadingHistory: false,
     loadingHistoryPage: false,
+    loadingTaskAuditPage: false,
     loadingModels: false,
     loadingTask: false,
     tasksLoadError: null,
     historyLoadError: null,
     historyPageLoadError: null,
+    taskAuditPageLoadError: null,
     modelsLoadError: null,
     taskLoadError: null,
     tasksLoadedAt: 0,
@@ -378,6 +421,52 @@ export const usePlatformStore = defineStore('platform', {
         if (this.historyPageRequestToken === requestToken) {
           this.loadingHistoryPage = false
         }
+      }
+    },
+
+    async fetchTaskAuditPage(query: TaskAuditPageQuery) {
+      const page = query.page > 0 ? query.page : 1
+      const pageSize = query.page_size > 0 ? query.page_size : 10
+
+      this.taskAuditPage = page
+      this.taskAuditPageSize = pageSize
+      this.loadingTaskAuditPage = true
+      this.taskAuditPageLoadError = null
+
+      try {
+        const result = await listTaskPage({
+          page,
+          page_size: pageSize,
+        })
+        const safePage = ensureTaskPage(result)
+
+        this.taskAuditPageItems = safePage.items
+        this.taskAuditPage = safePage.page
+        this.taskAuditPageSize = safePage.page_size
+        this.taskAuditTotal = safePage.total
+        this.taskAuditTotalPages = safePage.total_pages
+
+        if (safePage.items.length > 0) {
+          const merged = new Map<number, GenerateTask>()
+          for (const task of ensureArray(this.tasks)) {
+            merged.set(task.id, task)
+          }
+          for (const task of safePage.items) {
+            merged.set(task.id, task)
+          }
+          this.tasks = sortTasksByUpdatedAtDesc(Array.from(merged.values()))
+          this.tasksLoadedAt = Date.now()
+        }
+
+        return safePage
+      } catch (error) {
+        this.taskAuditPageItems = []
+        this.taskAuditTotal = 0
+        this.taskAuditTotalPages = 0
+        this.taskAuditPageLoadError = extractErrorMessage(error, '任务审计分页加载失败')
+        throw error
+      } finally {
+        this.loadingTaskAuditPage = false
       }
     },
 

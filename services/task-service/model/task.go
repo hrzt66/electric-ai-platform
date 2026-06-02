@@ -35,3 +35,16 @@ type UpdateJobStatusInput struct {
 	Stage        string `json:"stage" binding:"required"`
 	ErrorMessage string `json:"error_message"`
 }
+
+type JobPageQuery struct {
+	Page     int `form:"page"`
+	PageSize int `form:"page_size"`
+}
+
+type JobPageResult struct {
+	Items      []Job `json:"items"`
+	Page       int   `json:"page"`
+	PageSize   int   `json:"page_size"`
+	Total      int   `json:"total"`
+	TotalPages int   `json:"total_pages"`
+}

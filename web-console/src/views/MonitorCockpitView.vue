@@ -371,12 +371,13 @@ const missingReasons = computed(() => {
   gap: 22px;
   padding: 26px;
   border-radius: 24px;
-  color: #ecf4ff;
+  color: var(--ea-text);
   background:
-    radial-gradient(circle at top left, rgba(34, 197, 94, 0.22), transparent 35%),
-    radial-gradient(circle at right, rgba(14, 165, 233, 0.24), transparent 32%),
-    linear-gradient(138deg, #0a1b2d 0%, #112a42 60%, #081321 100%);
-  box-shadow: 0 22px 55px rgba(2, 12, 28, 0.35);
+    radial-gradient(circle at top left, rgba(29, 78, 216, 0.08), transparent 35%),
+    radial-gradient(circle at right, rgba(14, 165, 233, 0.06), transparent 32%),
+    linear-gradient(138deg, #ffffff 0%, #f8fafc 60%, #f1f5f9 100%);
+  border: 1px solid var(--ea-border);
+  box-shadow: var(--ea-shadow);
 }
 
 .status-head {
@@ -385,7 +386,7 @@ const missingReasons = computed(() => {
 }
 
 .status-tag {
-  color: #93c5fd;
+  color: var(--ea-primary-strong);
   font-size: 0.78rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -393,12 +394,12 @@ const missingReasons = computed(() => {
 
 .status-head h1 {
   font-size: clamp(1.9rem, 2.8vw, 2.6rem);
-  color: #f8fbff;
+  color: var(--ea-text);
 }
 
 .status-copy {
   max-width: 760px;
-  color: #bfdbfe;
+  color: var(--ea-text-muted);
   line-height: 1.7;
 }
 
@@ -417,9 +418,9 @@ const missingReasons = computed(() => {
   border-radius: 999px;
   font-size: 0.88rem;
   font-weight: 700;
-  color: #e0f2fe;
-  border: 1px solid rgba(148, 197, 255, 0.4);
-  background: rgba(125, 211, 252, 0.16);
+  color: var(--ea-primary-strong);
+  border: 1px solid rgba(29, 78, 216, 0.18);
+  background: rgba(219, 234, 254, 0.72);
 }
 
 .meta-grid {
@@ -431,20 +432,21 @@ const missingReasons = computed(() => {
 .meta-grid div {
   border-radius: 12px;
   padding: 10px 12px;
-  background: rgba(15, 23, 42, 0.32);
+  background: rgba(248, 250, 252, 0.98);
+  border: 1px solid var(--ea-border);
   display: grid;
   gap: 4px;
 }
 
 .meta-grid span {
   font-size: 0.74rem;
-  color: #93c5fd;
+  color: var(--ea-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .meta-grid strong {
-  color: #f0f9ff;
+  color: var(--ea-text);
   font-size: 0.95rem;
 }
 

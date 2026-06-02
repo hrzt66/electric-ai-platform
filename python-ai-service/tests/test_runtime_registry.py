@@ -226,6 +226,8 @@ def test_runtime_registry_builds_gpt_image2_runtime_from_settings(tmp_path):
         runtime_root=tmp_path,
         openai_api_key="test-key",
         openai_base_url="https://geekspace.cloud/v1",
+        openai_image_api_key="image-key",
+        openai_image_base_url="https://images.example/v1",
         openai_image_model="gpt-image-2",
     )
     registry = RuntimeRegistry(settings=settings)
@@ -234,6 +236,8 @@ def test_runtime_registry_builds_gpt_image2_runtime_from_settings(tmp_path):
 
     assert isinstance(runtime, OpenAIImageRuntime)
     assert runtime.output_dir == tmp_path / "image"
+    assert runtime.api_key == "image-key"
+    assert runtime.base_url == "https://images.example/v1"
     assert runtime.image_model == "gpt-image-2"
 
 

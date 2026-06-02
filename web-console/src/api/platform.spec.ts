@@ -9,7 +9,7 @@ const api = vi.hoisted(() => ({
 
 vi.mock('./http', () => api)
 
-import { buildImageUrl, getMonitorOverview, listAssetHistoryPage } from './platform'
+import { buildImageUrl, getMonitorOverview, listAssetHistoryPage, listTaskPage } from './platform'
 
 describe('buildImageUrl', () => {
   it('routes checked images to the dedicated image-check static path', () => {
@@ -52,6 +52,34 @@ describe('listAssetHistoryPage', () => {
         model_name: 'ssd1b-electric',
         status: 'scored',
         min_total_score: 60,
+      },
+    })
+  })
+})
+
+describe('listTaskPage', () => {
+  it('requests the paged task endpoint with backend query params', async () => {
+    api.http.get.mockResolvedValue({
+      data: {
+        data: {
+          items: [],
+          page: 3,
+          page_size: 10,
+          total: 125,
+          total_pages: 13,
+        },
+      },
+    })
+
+    await listTaskPage({
+      page: 3,
+      page_size: 10,
+    })
+
+    expect(api.http.get).toHaveBeenCalledWith('/tasks/page', {
+      params: {
+        page: 3,
+        page_size: 10,
       },
     })
   })

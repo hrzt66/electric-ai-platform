@@ -645,6 +645,7 @@ def score_visual_fidelity(
     sharpness = float(image_metrics.get("sharpness", 0.0))
     exposure = float(image_metrics.get("exposure", 0.0))
     contrast = float(image_metrics.get("contrast", 0.0))
+    noise_level = float(image_metrics.get("noise_level", 0.0))
     clarity_support = min(100.0, exposure * 0.55 + contrast * 0.45)
     expectation = build_prompt_expectation("", detections)
     target_class = _priority_target_class(expectation.detected_classes)
@@ -654,9 +655,11 @@ def score_visual_fidelity(
     width = float(focus_detection["bbox"][2]) if focus_detection is not None else 0.0
     height = float(focus_detection["bbox"][3]) if focus_detection is not None else 0.0
     area = width * height
+    denoised_detail = max(0.0, sharpness - noise_level * 0.55)
+    soft_detail = max(0.0, sharpness - noise_level * 0.35)
 
     if target_class == "wind_turbine":
-        detail_proxy = max(sharpness, clarity_support * 0.70 if sharpness >= 28.0 else sharpness)
+        detail_proxy = max(denoised_detail, min(sharpness, clarity_support * 0.48) if sharpness >= 28.0 else denoised_detail)
         structure_scale = min(100.0, (height / 0.55) * 70.0 + (area / 0.12) * 30.0)
         score = 10.0 + (
             detail_proxy * 0.42
@@ -667,7 +670,7 @@ def score_visual_fidelity(
             + semantic_prior * 0.04
         )
     elif target_class == "transmission_tower":
-        detail_proxy = max(sharpness, clarity_support * 0.56 if sharpness >= 34.0 else sharpness)
+        detail_proxy = max(denoised_detail, min(sharpness, clarity_support * 0.44) if sharpness >= 34.0 else denoised_detail)
         vertical_presence = min(100.0, height / 0.72 * 100.0)
         score = 8.0 + (
             detail_proxy * 0.48
@@ -678,7 +681,7 @@ def score_visual_fidelity(
             + semantic_prior * 0.04
         )
     elif target_class == "substation_primary":
-        detail_proxy = max(sharpness, clarity_support * 0.60 if sharpness >= 30.0 else sharpness)
+        detail_proxy = max(soft_detail, min(sharpness, clarity_support * 0.45) if sharpness >= 30.0 else soft_detail)
         dense_equipment_presence = min(100.0, area / 0.28 * 100.0)
         score = 8.0 + (
             detail_proxy * 0.42
@@ -689,7 +692,7 @@ def score_visual_fidelity(
             + semantic_prior * 0.06
         )
     elif target_class == "solar_panel":
-        detail_proxy = max(sharpness, clarity_support * 0.72 if sharpness >= 26.0 else sharpness)
+        detail_proxy = max(soft_detail, min(sharpness, clarity_support * 0.50) if sharpness >= 26.0 else soft_detail)
         wide_presence = min(100.0, (width / max(height, 1e-6)) / 3.0 * 100.0)
         array_coverage = min(100.0, area / 0.18 * 100.0)
         score = 8.0 + (
@@ -702,7 +705,7 @@ def score_visual_fidelity(
             + semantic_prior * 0.04
         )
     elif target_class == "dam":
-        detail_proxy = max(sharpness, clarity_support * 0.66 if sharpness >= 24.0 else sharpness)
+        detail_proxy = max(soft_detail, min(sharpness, clarity_support * 0.46) if sharpness >= 24.0 else soft_detail)
         wide_presence = min(100.0, (width / max(height, 1e-6)) / 2.8 * 100.0)
         mass_presence = min(100.0, area / 0.22 * 100.0)
         score = 8.0 + (
@@ -716,7 +719,7 @@ def score_visual_fidelity(
         )
     else:
         local_detail_bonus = min(8.0, len(detections) * 2.0)
-        detail_proxy = max(sharpness, clarity_support * 0.62 if sharpness >= 28.0 else sharpness)
+        detail_proxy = max(soft_detail, min(sharpness, clarity_support * 0.46) if sharpness >= 28.0 else soft_detail)
         score = 6.0 + (
             detail_proxy * 0.58
             + exposure * 0.22
@@ -727,10 +730,20 @@ def score_visual_fidelity(
 
     if sharpness < 25.0:
         score -= 10.0
+    elif sharpness < 40.0:
+        score -= 6.0
     if exposure < 35.0:
         score -= 6.0
     if contrast < 22.0:
         score -= 4.0
+    if noise_level >= 50.0:
+        score -= 18.0
+    elif noise_level >= 35.0:
+        score -= 10.0
+    elif noise_level >= 20.0:
+        score -= 4.0
+    if noise_level >= 35.0 and sharpness < 42.0:
+        score -= 10.0
     return clamp_score(score)
 
 

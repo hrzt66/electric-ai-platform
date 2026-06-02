@@ -2,18 +2,11 @@ import { createSSRApp, h } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { describe, expect, it, vi } from 'vitest'
 
+const push = vi.fn()
 const platformStore = {
-  models: [],
-  currentTask: null,
-  currentTaskId: null,
-  currentAssets: [],
-  currentTaskAudit: [],
+  models: [] as any[],
   modelsLoadError: '',
-  taskLoadError: '',
-  submitting: false,
   fetchModels: vi.fn(),
-  submitGenerateJob: vi.fn(),
-  refreshTask: vi.fn(),
 }
 
 vi.mock('../stores/platform', () => ({
@@ -21,39 +14,14 @@ vi.mock('../stores/platform', () => ({
 }))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ push }),
 }))
 
-vi.mock('../components/workbench/ParameterPanel.vue', () => ({
-  default: {
-    name: 'ParameterPanel',
-    props: ['form', 'models', 'scoringModels'],
-    template:
-      '<div class="parameter-panel-stub">{{ form.model_name }}|{{ form.scoring_model_name }}|{{ models.map((item) => item.model_name).join(",") }}|{{ scoringModels?.[0]?.display_name }}|{{ scoringModels?.[0]?.description }}</div>',
-  },
-}))
-
-vi.mock('../components/workbench/ResultPreview.vue', () => ({
-  default: { template: '<div class="result-preview-stub">preview</div>' },
-}))
-
-vi.mock('../components/workbench/GenerationProgressCard.vue', () => ({
-  default: { template: '<div class="progress-card-stub">progress</div>' },
-}))
-
-vi.mock('../components/workbench/ScoreRadar.vue', () => ({
-  default: { template: '<div class="score-radar-stub">score</div>' },
-}))
-
-vi.mock('../components/audit/AuditTimeline.vue', () => ({
-  default: { template: '<div class="audit-timeline-stub">audit</div>' },
-}))
-
-import GenerateView from './GenerateView.vue'
+import ModelCenterView from './ModelCenterView.vue'
 
 async function renderView() {
   const app = createSSRApp({
-    render: () => h(GenerateView),
+    render: () => h(ModelCenterView),
   })
 
   app.component('el-alert', {
@@ -75,36 +43,22 @@ async function renderView() {
     },
   })
 
-  app.component('el-empty', {
-    props: ['description'],
-    setup(props) {
-      return () => h('div', { class: 'el-empty-stub' }, props.description)
+  app.component('el-button', {
+    setup(_props, { slots }) {
+      return () => h('button', { class: 'el-button-stub' }, slots.default?.())
     },
   })
 
   return renderToString(app)
 }
 
-describe('GenerateView', () => {
-  it('defaults to SSD-1B generation while keeping electric-score-v1 scoring', async () => {
-    const html = await renderView()
-
-    expect(html).toContain('ssd1b-electric|electric-score-v1')
-  })
-
-  it('shows localized fallback scoring model copy in the model intro area', async () => {
-    const html = await renderView()
-
-    expect(html).toContain('电力评分 V1（兼容版）')
-    expect(html).toContain('兼容旧流程的四维评分模型')
-  })
-
-  it('only exposes the curated generation models in the parameter panel', async () => {
+describe('ModelCenterView', () => {
+  it('only shows the curated generation models in the generation section', async () => {
     platformStore.models = [
       {
         id: 1,
         model_name: 'sd15-electric',
-        display_name: 'SD 1.5 Electric Base',
+        display_name: 'SD 1.5 电力基础版',
         model_type: 'generation',
         service_name: 'python-ai-service',
         status: 'available',
@@ -116,7 +70,7 @@ describe('GenerateView', () => {
       {
         id: 2,
         model_name: 'sd15-electric-specialized',
-        display_name: 'SD 1.5 Electric Specialized',
+        display_name: 'SD 1.5 电力专精版',
         model_type: 'generation',
         service_name: 'python-ai-service',
         status: 'available',
@@ -128,7 +82,7 @@ describe('GenerateView', () => {
       {
         id: 3,
         model_name: 'ssd1b-electric',
-        display_name: 'SSD-1B Electric',
+        display_name: 'SSD-1B 电力极速版',
         model_type: 'generation',
         service_name: 'python-ai-service',
         status: 'available',
@@ -140,7 +94,7 @@ describe('GenerateView', () => {
       {
         id: 4,
         model_name: 'gpt-image-2',
-        display_name: 'GPT Image 2',
+        display_name: 'GPT Image 2 电力云生图',
         model_type: 'generation',
         service_name: 'python-ai-service',
         status: 'available',
@@ -152,7 +106,7 @@ describe('GenerateView', () => {
       {
         id: 5,
         model_name: 'unipic2-kontext',
-        display_name: 'UniPic2 Electric',
+        display_name: 'UniPic2 电力场景版',
         model_type: 'generation',
         service_name: 'python-ai-service',
         status: 'available',
@@ -161,11 +115,30 @@ describe('GenerateView', () => {
         default_negative_prompt: '',
         local_path: 'model/generation/unipic2-kontext',
       },
+      {
+        id: 6,
+        model_name: 'electric-score-v1',
+        display_name: '电力评分 V1（兼容版）',
+        model_type: 'scoring',
+        service_name: 'python-ai-service',
+        status: 'available',
+        description: '',
+        default_positive_prompt: '',
+        default_negative_prompt: '',
+        local_path: 'model/scoring/electric-score-v1',
+      },
     ]
 
     const html = await renderView()
 
-    expect(html).toContain('sd15-electric,sd15-electric-specialized,ssd1b-electric,gpt-image-2')
-    expect(html).not.toContain('unipic2-kontext')
+    expect(html).toContain('生成模型')
+    expect(html).toContain('4 个')
+    expect(html).toContain('SD 1.5 电力基础版')
+    expect(html).toContain('SD 1.5 电力专精版')
+    expect(html).toContain('SSD-1B 电力极速版')
+    expect(html).toContain('GPT Image 2 电力云生图')
+    expect(html).not.toContain('UniPic2 电力场景版')
+    expect(html).toContain('评分模型')
+    expect(html).toContain('电力评分 V1（兼容版）')
   })
 })

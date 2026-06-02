@@ -191,6 +191,79 @@ LIMIT 50
 	return jobs, rows.Err()
 }
 
+func (r *TaskRepository) ListPage(ctx context.Context, query model.JobPageQuery) (model.JobPageResult, error) {
+	if err := r.ensureSchema(ctx); err != nil {
+		return model.JobPageResult{}, err
+	}
+
+	page := query.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := query.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+
+	var total int
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM task_jobs`).Scan(&total); err != nil {
+		return model.JobPageResult{}, err
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+	}
+
+	offset := (page - 1) * pageSize
+	const querySQL = `
+SELECT id, job_type, status, stage, model_name, scoring_model_name, prompt, negative_prompt, payload_json, COALESCE(error_message, ''), created_at, updated_at
+FROM task_jobs
+ORDER BY updated_at DESC, id DESC
+LIMIT ? OFFSET ?
+`
+
+	rows, err := r.db.QueryContext(ctx, querySQL, pageSize, offset)
+	if err != nil {
+		return model.JobPageResult{}, err
+	}
+	defer rows.Close()
+
+	items := make([]model.Job, 0, pageSize)
+	for rows.Next() {
+		var job model.Job
+		if err := rows.Scan(
+			&job.ID,
+			&job.JobType,
+			&job.Status,
+			&job.Stage,
+			&job.ModelName,
+			&job.ScoringModelName,
+			&job.Prompt,
+			&job.NegativePrompt,
+			&job.PayloadJSON,
+			&job.ErrorMessage,
+			&job.CreatedAt,
+			&job.UpdatedAt,
+		); err != nil {
+			return model.JobPageResult{}, err
+		}
+		items = append(items, job)
+	}
+
+	if err := rows.Err(); err != nil {
+		return model.JobPageResult{}, err
+	}
+
+	return model.JobPageResult{
+		Items:      items,
+		Page:       page,
+		PageSize:   pageSize,
+		Total:      total,
+		TotalPages: totalPages,
+	}, nil
+}
+
 func (r *TaskRepository) UpdateStatus(ctx context.Context, id int64, input model.UpdateJobStatusInput) (model.Job, error) {
 	if err := r.ensureSchema(ctx); err != nil {
 		return model.Job{}, err

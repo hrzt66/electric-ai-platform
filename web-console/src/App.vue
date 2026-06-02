@@ -5,16 +5,16 @@
 <style>
 :root {
   color-scheme: light;
-  --ea-bg: #edf2f7;
+  --ea-bg: #f3f6fa;
   --ea-surface: #ffffff;
   --ea-surface-alt: #f8fafc;
-  --ea-text: #17202b;
-  --ea-text-muted: #53606f;
-  --ea-primary: #1447a6;
-  --ea-primary-strong: #0f3278;
-  --ea-accent: #d3a449;
-  --ea-border: rgba(15, 23, 32, 0.08);
-  --ea-shadow: 0 18px 36px rgba(15, 23, 32, 0.08);
+  --ea-text: #0f172a;
+  --ea-text-muted: #475569;
+  --ea-primary: #1d4ed8;
+  --ea-primary-strong: #1e3a8a;
+  --ea-accent: #0f766e;
+  --ea-border: #d9e2ec;
+  --ea-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
 }
 
 html,
@@ -33,8 +33,8 @@ body,
 body {
   font-family: 'Bahnschrift', 'Segoe UI', 'Microsoft YaHei', sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(211, 164, 73, 0.14), transparent 22%),
-    linear-gradient(180deg, #eff4fb 0%, #edf2f7 100%);
+    radial-gradient(circle at top left, rgba(29, 78, 216, 0.05), transparent 22%),
+    linear-gradient(180deg, #f8fafc 0%, #f3f6fa 100%);
   color: var(--ea-text);
 }
 

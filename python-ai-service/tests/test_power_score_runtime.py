@@ -70,6 +70,32 @@ class FakePhysicalGptRuntime:
         return dict(self._result)
 
 
+class FailingPhysicalGptRuntime:
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+        self.calls: list[dict] = []
+        self.failure_writes: list[dict] = []
+
+    def annotate_image(self, *, image_path: str, prompt: str) -> dict:
+        self.calls.append({"image_path": image_path, "prompt": prompt})
+        raise self._error
+
+    def write_failure_file(self, *, image_path: str, prompt: str, error_type: str, error_message: str):
+        self.failure_writes.append(
+            {
+                "image_path": image_path,
+                "prompt": prompt,
+                "error_type": error_type,
+                "error_message": error_message,
+            }
+        )
+        from pathlib import Path
+
+        path = Path(image_path).with_suffix(".error.json")
+        path.write_text("{}", encoding="utf-8")
+        return path
+
+
 def _build_runtime_with_injected_student(
     tmp_path,
     *,
@@ -389,28 +415,30 @@ def test_student_runtime_caps_gpt_physical_score_when_critical_wind_rule_fails(t
 
 
 def test_student_runtime_gives_low_gpt_physical_score_when_prompt_target_is_not_detected(tmp_path) -> None:
+    physical_gpt_runtime = FakePhysicalGptRuntime(
+        {
+            "score": 90.0,
+            "target_class": "wind_turbine",
+            "reason": "视觉上像风机，但当前检测模型没有检出目标。",
+            "present_elements": ["tower", "blade"],
+            "missing_elements": [],
+            "rule_checks": [
+                {"label": "叶片数量", "passed": True, "detail": "看起来接近 3 片"},
+                {"label": "塔身是否支撑机舱", "passed": True, "detail": "支撑关系看起来成立"},
+            ],
+        }
+    )
     runtime, image_path = _build_runtime_with_injected_student(
         tmp_path / "gpt_physical_missing_detection",
         detections=[],
         outputs=[58.0, 74.0, 70.0, 63.0],
-        physical_gpt_runtime=FakePhysicalGptRuntime(
-            {
-                "score": 90.0,
-                "target_class": "wind_turbine",
-                "reason": "视觉上像风机，但当前检测模型没有检出目标。",
-                "present_elements": ["tower", "blade"],
-                "missing_elements": [],
-                "rule_checks": [
-                    {"label": "叶片数量", "passed": True, "detail": "看起来接近 3 片"},
-                    {"label": "塔身是否支撑机舱", "passed": True, "detail": "支撑关系看起来成立"},
-                ],
-            }
-        ),
+        physical_gpt_runtime=physical_gpt_runtime,
     )
 
     scores = runtime.score_image(image_path, "realistic wind_turbine")
     physical = scores["score_explanation"]["dimensions"]["physical_plausibility"]
 
+    assert len(physical_gpt_runtime.calls) == 1
     assert scores["physical_plausibility"] <= 49.0
     assert physical["gpt_physical_annotation"]["score_band"] == "0-49"
     assert physical["inputs"]["detection_gate_triggered"] is True
@@ -446,6 +474,65 @@ def test_student_runtime_allows_gpt_physical_score_above_95_only_when_all_rules_
 
     assert scores["physical_plausibility"] == 98.0
     assert physical["gpt_physical_annotation"]["score_band"] == "95-100"
+
+
+def test_student_runtime_raises_and_records_reason_when_gpt_fails(tmp_path) -> None:
+    runtime, image_path = _build_runtime_with_injected_student(
+        tmp_path / "gpt_physical_failure",
+        detections=[
+            {"class_name": "wind_turbine", "confidence": 0.93, "bbox": [0.50, 0.52, 0.24, 0.70]},
+        ],
+        outputs=[58.0, 74.0, 70.0, 63.0],
+        physical_gpt_runtime=FailingPhysicalGptRuntime(RuntimeError("gateway 502")),
+    )
+
+    try:
+        runtime.score_image(image_path, "realistic electric power inspection photo with wind_turbine")
+    except RuntimeError as exc:
+        assert str(exc) == "gateway 502"
+    else:  # pragma: no cover
+        raise AssertionError("expected GPT physical scoring failure to stop electric-score-v2 scoring")
+
+    assert runtime._physical_gpt_runtime.failure_writes == [
+        {
+            "image_path": image_path,
+            "prompt": "realistic electric power inspection photo with wind_turbine",
+            "error_type": "RuntimeError",
+            "error_message": "gateway 502",
+        }
+    ]
+
+
+def test_student_runtime_unload_preserves_gpt_runtime_for_next_batch(tmp_path) -> None:
+    physical_gpt_runtime = FakePhysicalGptRuntime(
+        {
+            "score": 91.0,
+            "target_class": "wind_turbine",
+            "reason": "风机叶片完整，塔身与机舱关系合理。",
+            "present_elements": ["blade", "tower", "nacelle"],
+            "missing_elements": [],
+            "rule_checks": [
+                {"label": "叶片数量", "passed": True, "detail": "检测到 3 片叶片"},
+            ],
+        }
+    )
+    runtime, image_path = _build_runtime_with_injected_student(
+        tmp_path / "gpt_runtime_persisted",
+        detections=[
+            {"class_name": "wind_turbine", "confidence": 0.93, "bbox": [0.50, 0.52, 0.24, 0.70]},
+        ],
+        outputs=[58.0, 74.0, 70.0, 63.0],
+        physical_gpt_runtime=physical_gpt_runtime,
+    )
+
+    first_scores = runtime.score_image(image_path, "realistic wind_turbine")
+    runtime.unload()
+    second_scores = runtime.score_image(image_path, "realistic wind_turbine")
+
+    assert first_scores["physical_plausibility"] == 91.0
+    assert second_scores["physical_plausibility"] == 91.0
+    assert runtime._physical_gpt_runtime is physical_gpt_runtime
+    assert len(physical_gpt_runtime.calls) == 2
 
 
 def test_student_runtime_normalizes_substation_alias_to_six_class_target(tmp_path) -> None:

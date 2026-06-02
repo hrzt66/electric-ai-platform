@@ -59,6 +59,7 @@ const emit = defineEmits<{
   padding: 22px;
   border-radius: 24px;
   background: #ffffff;
+  border: 1px solid var(--ea-border);
   box-shadow: var(--ea-shadow);
 }
 
@@ -77,14 +78,14 @@ const emit = defineEmits<{
 
 .table-eyebrow {
   font-size: 0.8rem;
-  color: #8a5c18;
+  color: var(--ea-primary-strong);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
 
 .table-title {
   margin-top: 6px;
-  color: #17202b;
+  color: var(--ea-text);
   font-size: 1.4rem;
 }
 
@@ -106,7 +107,7 @@ const emit = defineEmits<{
 }
 
 .prompt-cell span {
-  color: #53606f;
+  color: var(--ea-text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

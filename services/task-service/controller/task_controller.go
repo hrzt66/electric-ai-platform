@@ -76,6 +76,28 @@ func (c *TaskController) ListJobs(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, httpx.OK(jobs, "task-list"))
 }
 
+func (c *TaskController) ListJobsPage(ctx *gin.Context) {
+	var query model.JobPageQuery
+	if err := ctx.ShouldBindQuery(&query); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"code":    1,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	page, err := c.svc.ListJobsPage(ctx.Request.Context(), query)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"code":    1,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, httpx.OK(page, "task-list-page"))
+}
+
 func (c *TaskController) UpdateTaskStatus(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {

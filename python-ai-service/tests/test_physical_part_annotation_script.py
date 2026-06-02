@@ -240,3 +240,23 @@ def test_retries_when_first_response_is_invalid_json(tmp_path) -> None:
 
     assert summary["record_count"] == 1
     assert len(client.calls) == 2
+
+
+def test_default_openai_client_does_not_duplicate_v1_suffix(monkeypatch) -> None:
+    from scripts.annotate_physical_parts_with_gpt import _default_openai_client
+
+    captured: dict[str, object] = {}
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr("openai.OpenAI", FakeOpenAI)
+
+    _default_openai_client(
+        api_key="test-key",
+        base_url="https://geekspace.cloud/v1",
+    )
+
+    assert captured["api_key"] == "test-key"
+    assert captured["base_url"] == "https://geekspace.cloud/v1"

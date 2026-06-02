@@ -102,7 +102,7 @@ def _load_response_payload(response_text: str) -> dict[str, Any]:
 def _default_openai_client(*, api_key: str, base_url: str):
     from openai import OpenAI
 
-    return OpenAI(api_key=api_key, base_url=base_url.rstrip("/") + "/v1")
+    return OpenAI(api_key=api_key, base_url=base_url.rstrip("/"))
 
 
 def annotate_directory(

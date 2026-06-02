@@ -11,6 +11,7 @@ import type {
   GenerateTaskRequest,
   ModelRecord,
   MonitorOverview,
+  TaskPageResult,
 } from '../types/platform'
 
 async function unwrap<T>(request: Promise<{ data: ApiEnvelope<T> }>): Promise<T> {
@@ -40,6 +41,14 @@ export function listTasks() {
         'Cache-Control': 'no-cache, no-store, max-age=0',
         Pragma: 'no-cache',
       },
+    }),
+  )
+}
+
+export function listTaskPage(params: { page: number; page_size: number }) {
+  return unwrap<TaskPageResult>(
+    http.get('/tasks/page', {
+      params,
     }),
   )
 }

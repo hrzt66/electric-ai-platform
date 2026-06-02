@@ -38,6 +38,44 @@ func (m *memoryRepo) List(ctx context.Context) ([]Job, error) {
 	return items, nil
 }
 
+func (m *memoryRepo) ListPage(ctx context.Context, query JobPageQuery) (JobPageResult, error) {
+	items, err := m.List(ctx)
+	if err != nil {
+		return JobPageResult{}, err
+	}
+
+	page := query.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := query.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+
+	total := len(items)
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+	}
+	start := (page - 1) * pageSize
+	if start > total {
+		start = total
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+
+	return JobPageResult{
+		Items:      items[start:end],
+		Page:       page,
+		PageSize:   pageSize,
+		Total:      total,
+		TotalPages: totalPages,
+	}, nil
+}
+
 func (m *memoryRepo) UpdateStatus(ctx context.Context, id int64, input UpdateJobStatusInput) (Job, error) {
 	job := m.items[id]
 	job.Status = input.Status

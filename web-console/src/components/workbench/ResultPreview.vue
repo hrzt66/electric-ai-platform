@@ -74,7 +74,7 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  align-self: start;
+  align-self: stretch;
 }
 
 .preview-header {
@@ -105,13 +105,16 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
 
 .image-stage {
   display: grid;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 10px;
-  align-content: start;
+  align-content: stretch;
+  flex: 1;
+  min-height: 0;
 }
 
 .image-frame {
-  height: clamp(220px, 30vh, 320px);
+  height: 100%;
+  min-height: clamp(320px, 42vh, 560px);
   padding: 12px;
   border-radius: 18px;
   overflow: hidden;
@@ -167,7 +170,7 @@ const activeAsset = computed(() => props.assets[props.activeIndex] ?? null)
 }
 
 .preview-empty {
-  min-height: clamp(220px, 30vh, 320px);
+  min-height: clamp(320px, 42vh, 560px);
 }
 
 :deep(.preview-empty .el-empty) {

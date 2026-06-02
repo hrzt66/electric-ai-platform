@@ -25,3 +25,5 @@ docs/thesis/
 ppt/
 *.docx
 docs/project-function-reference.md
+web-console/src/assets/generated/
+源代码/

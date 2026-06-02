@@ -153,6 +153,21 @@ def test_visual_fidelity_does_not_overreward_blurry_scene_with_good_exposure() -
     assert blurry < 70.0
 
 
+def test_visual_fidelity_penalizes_noisy_wind_scene_even_if_exposure_is_good() -> None:
+    noisy = score_visual_fidelity(
+        image_metrics={
+            "sharpness": 35.21,
+            "exposure": 91.97,
+            "contrast": 93.68,
+            "noise_level": 58.0,
+        },
+        detections=[{"class_name": "wind_turbine", "confidence": 0.67, "bbox": [0.285, 0.387, 0.218, 0.672]}],
+        semantic_prior=55.75,
+    )
+
+    assert noisy < 70.0
+
+
 def test_visual_fidelity_rewards_clear_transmission_tower_scene() -> None:
     crisp = score_visual_fidelity(
         image_metrics={

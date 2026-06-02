@@ -145,8 +145,8 @@ class RuntimeRegistry:
         """构造 OpenAI 兼容 Image 2 API 运行时实例。"""
         return OpenAIImageRuntime(
             output_dir=self._settings.output_image_dir,
-            api_key=self._settings.openai_api_key,
-            base_url=self._settings.openai_base_url,
+            api_key=self._settings.openai_image_api_key,
+            base_url=self._settings.openai_image_base_url,
             image_model=self._settings.openai_image_model,
         )
 

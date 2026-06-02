@@ -13,12 +13,24 @@ class FakeImagesClient:
 
     def generate(self, **kwargs):
         self.calls.append(kwargs)
+        if isinstance(self.response, list):
+            next_item = self.response.pop(0)
+            if isinstance(next_item, Exception):
+                raise next_item
+            return next_item
         return self.response
 
 
 class FakeOpenAIClient:
     def __init__(self, response) -> None:
         self.images = FakeImagesClient(response)
+
+
+class FakeTransientGatewayError(RuntimeError):
+    def __init__(self, message: str, *, status_code: int) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.response = None
 
 
 def test_openai_image_runtime_saves_base64_image_and_returns_record(tmp_path):
@@ -62,7 +74,7 @@ def test_openai_image_runtime_saves_base64_image_and_returns_record(tmp_path):
         {
             "model": "gpt-image-2",
             "prompt": "500kV substation",
-            "size": "auto",
+            "size": "1024x1024",
         }
     ]
 
@@ -132,7 +144,7 @@ def test_openai_image_runtime_rejects_unsupported_dalle2_size(tmp_path):
         )
 
 
-def test_openai_image_runtime_always_uses_auto_size_for_gpt_image(tmp_path):
+def test_openai_image_runtime_uses_supported_gpt_image_size_when_requested_dimensions_are_unsupported(tmp_path):
     from app.runtimes.openai_image_runtime import OpenAIImageRuntime
 
     client = FakeOpenAIClient({"data": [{"b64_json": base64.b64encode(b"fake-png-bytes").decode("ascii")}]})
@@ -161,9 +173,82 @@ def test_openai_image_runtime_always_uses_auto_size_for_gpt_image(tmp_path):
         {
             "model": "gpt-image-2",
             "prompt": "future wind farm",
-            "size": "auto",
+            "size": "1024x1024",
         }
     ]
+
+
+def test_openai_image_runtime_preserves_supported_gpt_image_size(tmp_path):
+    from app.runtimes.openai_image_runtime import OpenAIImageRuntime
+
+    client = FakeOpenAIClient({"data": [{"b64_json": base64.b64encode(b"wide-png-bytes").decode("ascii")}]})
+    runtime = OpenAIImageRuntime(
+        output_dir=tmp_path,
+        api_key="test-key",
+        base_url="https://www.boxying.com/v1",
+        image_model="gpt-image-2",
+        client_factory=lambda **_: client,
+    )
+
+    runtime.generate(
+        job_id=11,
+        prompt="wide substation panorama",
+        negative_prompt="ignored",
+        seed=2,
+        width=1536,
+        height=1024,
+        steps=20,
+        guidance_scale=7.5,
+        num_images=1,
+        model_name="gpt-image-2",
+    )
+
+    assert client.images.calls == [
+        {
+            "model": "gpt-image-2",
+            "prompt": "wide substation panorama",
+            "size": "1536x1024",
+        }
+    ]
+
+
+def test_openai_image_runtime_retries_transient_gateway_errors(tmp_path):
+    from app.runtimes.openai_image_runtime import OpenAIImageRuntime
+
+    transient_error = FakeTransientGatewayError(
+        "Error code: 503 - {'error': {'message': 'No available compatible accounts'}}",
+        status_code=503,
+    )
+    client = FakeOpenAIClient(
+        [
+            transient_error,
+            transient_error,
+            {"data": [{"b64_json": base64.b64encode(b"recovered-png-bytes").decode("ascii")}]},
+        ]
+    )
+    runtime = OpenAIImageRuntime(
+        output_dir=tmp_path,
+        api_key="test-key",
+        base_url="https://www.boxying.com/v1",
+        image_model="gpt-image-2",
+        client_factory=lambda **_: client,
+    )
+
+    records = runtime.generate(
+        job_id=12,
+        prompt="substation after transient outage",
+        negative_prompt="ignored",
+        seed=3,
+        width=512,
+        height=512,
+        steps=20,
+        guidance_scale=7.5,
+        num_images=1,
+        model_name="gpt-image-2",
+    )
+
+    assert len(records) == 1
+    assert len(client.images.calls) == 3
 
 
 def test_openai_image_runtime_builds_openai_client_with_standalone_compatible_httpx_settings(tmp_path, monkeypatch):

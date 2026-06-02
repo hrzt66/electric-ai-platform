@@ -33,6 +33,19 @@ export type GenerateTask = {
   updated_at: string
 }
 
+export type TaskAuditPageQuery = {
+  page: number
+  page_size: number
+}
+
+export type TaskPageResult = {
+  items: GenerateTask[]
+  page: number
+  page_size: number
+  total: number
+  total_pages: number
+}
+
 export type ScoreSummary = {
   visual_fidelity: number
   text_consistency: number

@@ -29,8 +29,8 @@ describe('ScoreRadar', () => {
     const html = await renderRadar(createScores())
 
     expect(html).toContain('grade-chip')
-    expect(html).toContain('>优秀<')
-    expect(html).toContain('>达标<')
+    expect(html).toContain('>良好<')
+    expect(html).toContain('>较差<')
     expect(html).toContain('>偏低<')
     expect(html).toContain('51.27')
   })

@@ -6,12 +6,16 @@ type MonitorStoreMock = {
   tasks: unknown[]
   history: unknown[]
   models: unknown[]
+  historyTotal: number
+  taskAuditTotal: number
   monitorOverview: Record<string, unknown> | null
   tasksLoadError: string
   historyLoadError: string
   modelsLoadError: string
   fetchTasks: ReturnType<typeof vi.fn>
   fetchHistory: ReturnType<typeof vi.fn>
+  fetchHistoryPage: ReturnType<typeof vi.fn>
+  fetchTaskAuditPage: ReturnType<typeof vi.fn>
   fetchModels: ReturnType<typeof vi.fn>
   fetchMonitorOverview: ReturnType<typeof vi.fn>
 }
@@ -20,12 +24,16 @@ const platformStore: MonitorStoreMock = {
   tasks: [],
   history: [],
   models: [],
+  historyTotal: 0,
+  taskAuditTotal: 0,
   monitorOverview: null,
   tasksLoadError: '',
   historyLoadError: '',
   modelsLoadError: '',
   fetchTasks: vi.fn(),
   fetchHistory: vi.fn(),
+  fetchHistoryPage: vi.fn(),
+  fetchTaskAuditPage: vi.fn(),
   fetchModels: vi.fn(),
   fetchMonitorOverview: vi.fn(),
 }
@@ -91,11 +99,15 @@ describe('DashboardView', () => {
     platformStore.tasks = []
     platformStore.history = []
     platformStore.models = []
+    platformStore.historyTotal = 0
+    platformStore.taskAuditTotal = 0
     platformStore.tasksLoadError = ''
     platformStore.historyLoadError = ''
     platformStore.modelsLoadError = ''
     platformStore.fetchTasks.mockReset()
     platformStore.fetchHistory.mockReset()
+    platformStore.fetchHistoryPage.mockReset()
+    platformStore.fetchTaskAuditPage.mockReset()
     platformStore.fetchModels.mockReset()
     platformStore.fetchMonitorOverview.mockReset()
   })
@@ -105,10 +117,13 @@ describe('DashboardView', () => {
 
     const html = await renderView()
 
-    expect(html).toContain('平台概览')
+    expect(html).toContain('统一平台总览')
+    expect(html).toContain('生成、评分')
     expect(html).toContain('任务总数')
     expect(html).toContain('历史资产')
     expect(html).toContain('可用模型')
+    expect(html).toContain('href=&quot;/generate&quot;')
+    expect(html).toContain('进入生成工作台')
     expect(html).not.toContain('AI 运行健康')
     expect(html).not.toContain('进入监控驾驶舱')
   })
@@ -123,6 +138,8 @@ describe('DashboardView', () => {
         updated_at: '2026-05-03T10:00:00Z',
       },
     ]
+    platformStore.taskAuditTotal = 12
+    platformStore.historyTotal = 30
     platformStore.models = [
       {
         id: 7,

@@ -101,7 +101,8 @@ class PowerScoreRuntime:
         self._transform = None
         self._yolo = None
         self._physical_part_yolo = None
-        self._physical_gpt_runtime = None
+        # Keep the injected GPT runtime across batches: it is not a GPU resident model
+        # and cannot be lazily reconstructed from the local bundle on the next request.
         if self.device.type == "cuda":
             torch.cuda.empty_cache()
         elif self.device.type == "mps" and hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
@@ -182,21 +183,14 @@ class PowerScoreRuntime:
         raw_values = {name: clamp_score(float(value)) for name, value in zip(targets, output)}
         total_weights = self._config.get("total_weights", DEFAULT_TOTAL_WEIGHTS)
         calibrated = calibrate_student_scores(raw_values, total_weights)
-        if gpt_physical_annotation is not None and "score" in gpt_physical_annotation:
-            gpt_physical_annotation = self._apply_detection_gate_to_gpt_physical_annotation(
-                gpt_physical_annotation=gpt_physical_annotation,
-                prompt=prompt,
-                detections=detections,
-            )
-            physical_score = float(gpt_physical_annotation["score"])
-        else:
-            physical_score = score_physical_plausibility(
-                prompt=prompt,
-                detections=detections,
-                semantic_prior=calibrated["physical_plausibility"],
-                image=image,
-                physical_part_detections=physical_part_detections,
-            )
+        if "score" not in gpt_physical_annotation:
+            raise RuntimeError("GPT physical scoring returned payload without score for electric-score-v2.")
+        gpt_physical_annotation = self._apply_detection_gate_to_gpt_physical_annotation(
+            gpt_physical_annotation=gpt_physical_annotation,
+            prompt=prompt,
+            detections=detections,
+        )
+        physical_score = float(gpt_physical_annotation["score"])
         grounded = recompute_total_score(
             {
                 "visual_fidelity": score_visual_fidelity(
@@ -231,6 +225,7 @@ class PowerScoreRuntime:
                 detections=detections,
                 physical_part_detections=physical_part_detections,
                 gpt_physical_annotation=gpt_physical_annotation,
+                gpt_failure=None,
                 prompt=prompt,
                 physical_semantic_prior=calibrated["physical_plausibility"],
             ),
@@ -239,15 +234,27 @@ class PowerScoreRuntime:
             result["checked_image_path"] = checked_image_path
         return result
 
-    def _annotate_physical_with_gpt(self, *, image_path: str, prompt: str) -> dict[str, Any] | None:
+    def _annotate_physical_with_gpt(self, *, image_path: str, prompt: str) -> dict[str, Any]:
         if self._physical_gpt_runtime is None:
-            return None
+            raise RuntimeError("GPT physical runtime is required for electric-score-v2 physical scoring.")
         try:
             payload = self._physical_gpt_runtime.annotate_image(image_path=image_path, prompt=prompt)
-        except Exception:
-            return None
+        except Exception as exc:
+            if hasattr(self._physical_gpt_runtime, "write_failure_file"):
+                try:
+                    self._physical_gpt_runtime.write_failure_file(
+                        image_path=image_path,
+                        prompt=prompt,
+                        error_type=type(exc).__name__,
+                        error_message=str(exc),
+                    )
+                except Exception:
+                    pass
+            raise
         if not isinstance(payload, dict):
-            return None
+            raise RuntimeError(
+                f"GPT physical scoring returned invalid payload type for electric-score-v2: {type(payload).__name__}"
+            )
         return GPTPhysicalRuntime.normalize_annotation_payload(payload)
 
     def _apply_detection_gate_to_gpt_physical_annotation(
@@ -429,6 +436,19 @@ class PowerScoreRuntime:
         gray = rgb.mean(axis=2)
         sharpness_raw = float(np.mean(np.abs(np.diff(gray, axis=0))) + np.mean(np.abs(np.diff(gray, axis=1))))
         sharpness = clamp_score(min(100.0, sharpness_raw * 900.0))
+        local_mean = (
+            gray
+            + np.roll(gray, 1, axis=0)
+            + np.roll(gray, -1, axis=0)
+            + np.roll(gray, 1, axis=1)
+            + np.roll(gray, -1, axis=1)
+            + np.roll(np.roll(gray, 1, axis=0), 1, axis=1)
+            + np.roll(np.roll(gray, 1, axis=0), -1, axis=1)
+            + np.roll(np.roll(gray, -1, axis=0), 1, axis=1)
+            + np.roll(np.roll(gray, -1, axis=0), -1, axis=1)
+        ) / 9.0
+        noise_residual = gray - local_mean
+        noise_level = clamp_score(min(100.0, float(np.std(noise_residual)) * 1200.0))
 
         mean_luma = float(gray.mean())
         clipped_ratio = float(np.mean((gray < 0.03) | (gray > 0.97)))
@@ -461,6 +481,7 @@ class PowerScoreRuntime:
 
         return {
             "sharpness": sharpness,
+            "noise_level": noise_level,
             "exposure": clamp_score(exposure),
             "contrast": contrast,
             "coverage": clamp_score(coverage_score),
@@ -498,6 +519,7 @@ class PowerScoreRuntime:
         detections: list[dict[str, Any]],
         physical_part_detections: list[dict[str, Any]],
         gpt_physical_annotation: dict[str, Any] | None,
+        gpt_failure: dict[str, Any] | None,
         prompt: str,
         physical_semantic_prior: float,
     ) -> dict[str, Any]:
@@ -526,6 +548,7 @@ class PowerScoreRuntime:
                     detections=detections,
                     physical_part_detections=physical_part_detections,
                     gpt_physical_annotation=gpt_physical_annotation,
+                    gpt_failure=gpt_failure,
                     checked_image_path=checked_image_path,
                     prompt=prompt,
                     physical_semantic_prior=physical_semantic_prior,
@@ -559,9 +582,12 @@ class PowerScoreRuntime:
         exposure = float(image_analysis["exposure"])
         sharpness = float(image_analysis["sharpness"])
         contrast = float(image_analysis["contrast"])
+        noise_level = float(image_analysis.get("noise_level", 0.0))
         detected_classes = build_prompt_expectation("", detections).detected_classes
         target_class = _priority_target_class(detected_classes) or "generic"
-        if exposure < 35.0 or sharpness < 30.0:
+        if noise_level >= 50.0:
+            summary = "图像存在明显高频噪点或拖影，虽然亮度正常，但真实感和细节质量不足。"
+        elif exposure < 35.0 or sharpness < 30.0:
             summary = "图像细节和曝光都不理想，设备边缘与纹理可辨性较弱。"
         elif exposure < 70.0 or sharpness < 65.0:
             summary = "整体清晰度可用，但局部细节和曝光仍有提升空间。"
@@ -572,19 +598,24 @@ class PowerScoreRuntime:
             "score": score,
             "grade_label": self._score_grade_label(score),
             "uses_yolo": True,
-            "summary": summary,
+            "summary": f"{summary} 该维度主要衡量图像是否清晰、纹理是否真实、设备边缘是否可信。",
             "formula": "最终视觉保真 = 基础清晰度/曝光/对比度 + 检测主类结构清晰度补偿；按主类使用 5 套规则。",
             "details": [
+                "视觉保真用于判断图像是否像一张可用的真实电力场景图片，重点关注清晰度、细节纹理和整体成像质量。",
+                self._dimension_score_reference("visual_fidelity"),
                 f"主判类别为 {target_class}，视觉保真会按该电力主类切换对应规则。",
                 f"锐度为 {sharpness:.2f}，数值越低通常意味着边缘和纹理更软。",
                 f"曝光为 {exposure:.2f}，夜景或暗部过重会削弱设备细节的可辨识度。",
                 f"对比度为 {contrast:.2f}，它决定了主体层次和设备表面细节的分离度。",
+                f"噪点指标为 {noise_level:.2f}，数值越高通常表示高频噪声、颗粒感或拖影越明显。",
+                f"当前该图视觉保真为 {score:.2f} 分，等级为“{self._score_grade_label(score)}”，说明 {self._score_grade_hint('visual_fidelity', score)}。",
             ],
             "inputs": {
                 "raw_score": raw_scores["visual_fidelity"],
                 "calibrated_score": calibrated_scores["visual_fidelity"],
                 "final_score": final_scores["visual_fidelity"],
                 "sharpness": image_analysis["sharpness"],
+                "noise_level": image_analysis.get("noise_level", 0.0),
                 "exposure": image_analysis["exposure"],
                 "contrast": image_analysis["contrast"],
                 "target_class": target_class,
@@ -617,13 +648,16 @@ class PowerScoreRuntime:
             "score": score,
             "grade_label": self._score_grade_label(score),
             "uses_yolo": True,
-            "summary": summary,
+            "summary": f"{summary} 该维度主要衡量生成结果是否真正符合提示词要求。",
             "formula": "最终文本一致 = 检测匹配召回 + 目标置信度质量 + 少量语义先验补充。",
             "details": [
+                "文本一致关注 prompt 中要求出现的关键电力对象、场景主体和核心语义是否真的被生成出来。",
+                self._dimension_score_reference("text_consistency"),
                 f"提示词推断需要出现的对象为 {self._format_class_list(expected_classes)}。",
                 f"实际检测到的对象为 {self._format_class_list(detected_classes)}。",
                 f"成功匹配的对象为 {self._format_class_list(matched_classes)}，缺失对象为 {self._format_class_list(missing_classes)}。",
                 f"keyword_coverage 为 {float(prompt_analysis['keyword_coverage']):.2f}，electric_presence 为 {float(prompt_analysis['electric_presence']):.2f}，主类是否检出会直接影响最终分。",
+                f"当前该图文本一致为 {score:.2f} 分，等级为“{self._score_grade_label(score)}”，说明 {self._score_grade_hint('text_consistency', score)}。",
             ],
             "checked_image_path": checked_image_path,
             "expected_classes": expected_classes,
@@ -649,6 +683,7 @@ class PowerScoreRuntime:
         detections: list[dict[str, Any]],
         physical_part_detections: list[dict[str, Any]],
         gpt_physical_annotation: dict[str, Any] | None,
+        gpt_failure: dict[str, Any] | None,
         checked_image_path: str | None,
         prompt: str,
         physical_semantic_prior: float,
@@ -662,9 +697,11 @@ class PowerScoreRuntime:
                 "grade_label": self._score_grade_label(score),
                 "uses_yolo": False,
                 "uses_gpt": True,
-                "summary": str(gpt_physical_annotation.get("reason") or "GPT-5.4 已按电力工程规则完成物理合理性判定。"),
+                "summary": f"{str(gpt_physical_annotation.get('reason') or 'GPT-5.4 已按电力工程规则完成物理合理性判定。')} 该维度主要判断结构、连接关系和工程逻辑是否成立。",
                 "formula": "最终物理合理 = GPT-5.4 视觉模型基于设备缺失、结构关系与工程规则直接评分。",
                 "details": [
+                    "物理合理用于判断图像中的设备结构、连接方式、支撑关系和空间逻辑是否符合电力工程常识。",
+                    self._dimension_score_reference("physical_plausibility"),
                     f"主体类别判断为 {str(gpt_physical_annotation.get('target_class') or 'unknown')}。",
                     f"已识别关键结构: {self._format_class_list([str(item) for item in gpt_physical_annotation.get('present_elements') or []])}。",
                     f"缺失关键结构: {self._format_class_list([str(item) for item in gpt_physical_annotation.get('missing_elements') or []])}。",
@@ -672,6 +709,7 @@ class PowerScoreRuntime:
                         f"{str(item.get('label') or '')} {'通过' if bool(item.get('passed')) else '未通过'}: {str(item.get('detail') or '')}"
                         for item in rule_checks
                     ],
+                    f"当前该图物理合理为 {score:.2f} 分，等级为“{self._score_grade_label(score)}”，说明 {self._score_grade_hint('physical_plausibility', score)}。",
                 ],
                 "checked_image_path": checked_image_path,
                 "expected_classes": sorted(str(item) for item in prompt_analysis["expected_classes"]),
@@ -704,9 +742,18 @@ class PowerScoreRuntime:
             "grade_label": self._score_grade_label(score),
             "uses_yolo": True,
             "uses_gpt": False,
-            "summary": summary,
+            "summary": f"{summary} 该维度主要判断设备结构与工程逻辑是否讲得通。",
             "formula": "最终物理合理 = 主类结构规则/部件证据 + 拓扑关系 + 目标匹配质量 - 几何异常惩罚。",
             "details": [
+                "物理合理重点评估主体是否符合电力工程规律，包括连接关系、支撑方式、部件完整性和拓扑是否自然。",
+                self._dimension_score_reference("physical_plausibility"),
+                *(
+                    [
+                        f"GPT 物理判定本次未成功，系统已自动回退到本地规则评分。失败原因：{str(gpt_failure.get('error_type') or '')} - {str(gpt_failure.get('error_message') or '')}"
+                    ]
+                    if gpt_failure is not None
+                    else []
+                ),
                 f"结构规则均分为 {physical.rule_score:.2f}，拓扑信号为 {topology:.2f}，目标匹配质量为 {physical.matched_quality:.2f}。",
                 f"提示词期望对象为 {self._format_class_list(expected_classes)}，当前匹配到 {self._format_class_list(matched_classes)}。",
                 f"几何异常惩罚为 {physical.geometry_penalty:.2f}，缺失的关键对象为 {self._format_class_list(missing_classes)}。",
@@ -714,6 +761,7 @@ class PowerScoreRuntime:
                     f"{item.label} {item.score:.2f}: {item.detail}"
                     for item in physical.checks
                 ],
+                f"当前该图物理合理为 {score:.2f} 分，等级为“{self._score_grade_label(score)}”，说明 {self._score_grade_hint('physical_plausibility', score)}。",
             ],
             "checked_image_path": checked_image_path,
             "expected_classes": expected_classes,
@@ -729,6 +777,7 @@ class PowerScoreRuntime:
                 "electric_presence": float(prompt_analysis["electric_presence"]),
                 "rule_score": physical.rule_score,
                 "geometry_penalty": physical.geometry_penalty,
+                **({"gpt_fallback_reason": str(gpt_failure.get("error_message") or "")} if gpt_failure is not None else {}),
             },
         }
 
@@ -754,12 +803,15 @@ class PowerScoreRuntime:
             "score": score,
             "grade_label": self._score_grade_label(score),
             "uses_yolo": True,
-            "summary": summary,
+            "summary": f"{summary} 该维度主要衡量主体布局是否协调、画面是否自然易读。",
             "formula": "最终构图美学 = 主体布局规则 + 覆盖率/平衡性 + 分类别构图补偿。",
             "details": [
+                "构图美学用于判断画面是否适合展示，包括主体是否突出、布局是否平衡、视觉中心是否明确。",
+                self._dimension_score_reference("composition_aesthetics"),
                 f"主体覆盖率指标为 {image_analysis['coverage']:.2f}，过高或过低都会削弱画面组织感。",
                 f"平衡性指标为 {image_analysis['balance']:.2f}，它反映主体重心是否过度偏向某一侧。",
                 "系统会根据 wind_turbine、transmission_tower、substation_primary、solar_panel、dam 五类主目标切换不同构图规则。",
+                f"当前该图构图美学为 {score:.2f} 分，等级为“{self._score_grade_label(score)}”，说明 {self._score_grade_hint('composition_aesthetics', score)}。",
             ],
             "inputs": {
                 "raw_score": raw_scores["composition_aesthetics"],
@@ -781,7 +833,10 @@ class PowerScoreRuntime:
             for key in total_weights
         }
         weakest_dimension = min(total_weights, key=lambda item: float(final_scores[item]))
-        summary = f"{DIMENSION_TITLES[weakest_dimension]} 是当前最低维度，它对总分形成了最明显的拖累。"
+        summary = (
+            f"{DIMENSION_TITLES[weakest_dimension]} 是当前最低维度，它对总分形成了最明显的拖累。"
+            " 总分并不是平均值，而是按业务权重加权得到的综合结果。"
+        )
         return {
             "title": DIMENSION_TITLES["total_score"],
             "score": float(final_scores["total_score"]),
@@ -790,10 +845,13 @@ class PowerScoreRuntime:
             "summary": summary,
             "formula": "总分 = 0.21 * 视觉保真 + 0.37 * 文本一致 + 0.24 * 物理合理 + 0.18 * 构图美学。",
             "details": [
+                "总分用于综合反映一张图是否既清晰、又贴题、同时符合工程常识并具备较好的展示效果。",
+                "总分档位可理解为：95-100 优秀；85-94 良好；70-84 达标；50-69 偏低；0-49 较差。",
                 f"视觉保真贡献 {contributions['visual_fidelity']:.2f} = {final_scores['visual_fidelity']:.2f} * {total_weights['visual_fidelity']:.2f}",
                 f"文本一致贡献 {contributions['text_consistency']:.2f} = {final_scores['text_consistency']:.2f} * {total_weights['text_consistency']:.2f}",
                 f"物理合理贡献 {contributions['physical_plausibility']:.2f} = {final_scores['physical_plausibility']:.2f} * {total_weights['physical_plausibility']:.2f}",
                 f"构图美学贡献 {contributions['composition_aesthetics']:.2f} = {final_scores['composition_aesthetics']:.2f} * {total_weights['composition_aesthetics']:.2f}",
+                f"当前总分为 {float(final_scores['total_score']):.2f} 分，等级为“{self._score_grade_label(float(final_scores['total_score']))}”。",
             ],
             "inputs": {
                 "weights": {
@@ -824,15 +882,70 @@ class PowerScoreRuntime:
         return ", ".join(items)
 
     @staticmethod
+    def _dimension_score_reference(dimension: str) -> str:
+        references = {
+            "visual_fidelity": "分数参考：95-100 表示图像极清晰、细节完整；85-94 表示整体很清晰，仅有轻微瑕疵；70-84 表示基本清晰但有少量模糊；50-69 表示噪点或模糊已经明显；0-49 表示失真严重、可辨性较差。",
+            "composition_aesthetics": "分数参考：95-100 表示构图专业、视觉中心突出；85-94 表示整体协调自然；70-84 表示总体良好但略有不平衡；50-69 表示布局较乱、层次偏弱；0-49 表示构图混乱、整体观感较差。",
+            "text_consistency": "分数参考：95-100 表示关键元素全部匹配 prompt；85-94 表示主要元素匹配、细节略有偏差；70-84 表示主体正确但存在部分遗漏；50-69 表示只满足部分要求；0-49 表示与提示词基本无关。",
+            "physical_plausibility": "分数参考：95-100 表示完全符合电力工程规律；85-94 表示整体合理，仅有少量细节偏差；70-84 表示局部存在不自然之处；50-69 表示已经出现明显结构错误；0-49 表示基本不符合物理规律。",
+        }
+        return references.get(dimension, "")
+
+    @staticmethod
+    def _score_grade_hint(dimension: str, score: float) -> str:
+        value = max(0.0, min(100.0, float(score)))
+        if dimension == "visual_fidelity":
+            if value >= 95.0:
+                return "图像非常清晰，设备纹理、边缘和细节都较完整"
+            if value >= 85.0:
+                return "图像整体清晰，仅存在轻微细节瑕疵"
+            if value >= 70.0:
+                return "图像基本可用，但局部清晰度还有提升空间"
+            if value >= 50.0:
+                return "图像已经出现较明显噪点、模糊或细节缺失"
+            return "图像失真较重，主体细节辨识度不足"
+        if dimension == "composition_aesthetics":
+            if value >= 95.0:
+                return "画面构图成熟，主体突出且视觉中心明确"
+            if value >= 85.0:
+                return "整体布局协调自然，展示效果较好"
+            if value >= 70.0:
+                return "构图总体达标，但平衡性或张力仍可提升"
+            if value >= 50.0:
+                return "布局略显杂乱，主体组织感偏弱"
+            return "画面结构混乱，观看时较难形成稳定视觉中心"
+        if dimension == "text_consistency":
+            if value >= 95.0:
+                return "prompt 中的关键对象和场景要求基本都被完整满足"
+            if value >= 85.0:
+                return "主要对象已经匹配，只有少量细节与提示词略有偏差"
+            if value >= 70.0:
+                return "主体方向正确，但仍存在漏检或遗漏元素"
+            if value >= 50.0:
+                return "只满足了提示词中的部分要求"
+            return "图像与 prompt 的核心语义关联较弱"
+        if dimension == "physical_plausibility":
+            if value >= 95.0:
+                return "结构关系完整，较好符合电力工程和物理规律"
+            if value >= 85.0:
+                return "整体工程逻辑成立，仅有轻微细节偏差"
+            if value >= 70.0:
+                return "主体基本合理，但局部连接或比例仍不够自然"
+            if value >= 50.0:
+                return "已经存在比较明显的结构或连接问题"
+            return "主体结构和工程逻辑难以成立"
+        return "该分数反映当前维度仍有改进空间"
+
+    @staticmethod
     def _score_grade_label(score: float) -> str:
         value = max(0.0, min(100.0, float(score)))
-        if value < 30.0:
-            return "待改进"
         if value < 50.0:
-            return "偏低"
+            return "较差"
         if value < 70.0:
-            return "达标"
+            return "偏低"
         if value < 85.0:
+            return "达标"
+        if value < 95.0:
             return "良好"
         return "优秀"
 

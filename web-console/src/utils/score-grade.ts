@@ -8,11 +8,11 @@ export type ScoreBand = {
 }
 
 export const SCORE_BANDS: ScoreBand[] = [
-  { key: 'poor', label: '待改进', min: 0, maxExclusive: 30 },
-  { key: 'weak', label: '偏低', min: 30, maxExclusive: 50 },
-  { key: 'qualified', label: '达标', min: 50, maxExclusive: 70 },
-  { key: 'good', label: '良好', min: 70, maxExclusive: 85 },
-  { key: 'excellent', label: '优秀', min: 85, maxExclusive: null },
+  { key: 'poor', label: '较差', min: 0, maxExclusive: 50 },
+  { key: 'weak', label: '偏低', min: 50, maxExclusive: 70 },
+  { key: 'qualified', label: '达标', min: 70, maxExclusive: 85 },
+  { key: 'good', label: '良好', min: 85, maxExclusive: 95 },
+  { key: 'excellent', label: '优秀', min: 95, maxExclusive: null },
 ]
 
 export function getScoreBand(score: number): ScoreBand {

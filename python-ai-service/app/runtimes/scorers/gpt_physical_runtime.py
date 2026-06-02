@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from httpx import Client as HttpxClient
+
 from app.core.settings import get_settings
 from training.scoring.rubric import build_prompt_expectation, canonicalize_detection_class_name
 
@@ -31,7 +33,13 @@ CRITICAL_RULE_LABEL_KEYWORDS = {
 def _default_openai_client(*, api_key: str, base_url: str):
     from openai import OpenAI
 
-    return OpenAI(api_key=api_key, base_url=base_url.rstrip("/"))
+    http_client = HttpxClient(trust_env=False, timeout=300)
+    return OpenAI(
+        api_key=api_key,
+        base_url=base_url.rstrip("/"),
+        http_client=http_client,
+        max_retries=0,
+    )
 
 
 def _encode_image(path: Path) -> str:
@@ -70,6 +78,7 @@ class GPTPhysicalRuntime:
         api_key: str | None = None,
         base_url: str | None = None,
         model: str = "gpt-5.4",
+        max_attempts: int = 3,
         client: Any | None = None,
     ) -> None:
         settings = get_settings()
@@ -77,6 +86,7 @@ class GPTPhysicalRuntime:
         self._api_key = api_key if api_key is not None else settings.openai_api_key
         self._base_url = base_url if base_url is not None else settings.openai_base_url
         self._model = model
+        self._max_attempts = max(1, int(max_attempts))
         self._client = client
 
     def annotate_image(self, *, image_path: str, prompt: str) -> dict[str, Any]:
@@ -88,33 +98,48 @@ class GPTPhysicalRuntime:
         client = self._client or _default_openai_client(api_key=self._api_key, base_url=self._base_url)
         image_file = Path(image_path)
         prompt_expected_classes = sorted(build_prompt_expectation(prompt, []).expected_classes)
-        response = client.responses.create(
-            model=self._model,
-            input=[
-                {
-                    "role": "system",
-                    "content": [{"type": "input_text", "text": self._system_prompt()}],
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": f"prompt={prompt}"},
+        normalized: dict[str, Any] | None = None
+        raw_output_text = ""
+        last_error: Exception | None = None
+
+        for _ in range(self._max_attempts):
+            try:
+                response = client.responses.create(
+                    model=self._model,
+                    input=[
                         {
-                            "type": "input_text",
-                            "text": f"text_consistency_expected_classes={','.join(prompt_expected_classes) if prompt_expected_classes else 'none'}",
+                            "role": "system",
+                            "content": [{"type": "input_text", "text": self._system_prompt()}],
                         },
-                        {"type": "input_image", "image_url": _encode_image(image_file)},
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": f"prompt={prompt}"},
+                                {
+                                    "type": "input_text",
+                                    "text": f"text_consistency_expected_classes={','.join(prompt_expected_classes) if prompt_expected_classes else 'none'}",
+                                },
+                                {"type": "input_image", "image_url": _encode_image(image_file)},
+                            ],
+                        },
                     ],
-                },
-            ],
-        )
-        payload = json.loads(_extract_json_text(response.output_text))
-        normalized = self.normalize_annotation_payload(payload)
+                )
+                raw_output_text = response.output_text
+                payload = json.loads(_extract_json_text(raw_output_text))
+                normalized = self.normalize_annotation_payload(payload)
+                break
+            except Exception as exc:
+                last_error = exc
+
+        if normalized is None:
+            assert last_error is not None
+            raise last_error
+
         saved_path = self._write_annotation_file(
             image_path=image_file,
             prompt=prompt,
             normalized=normalized,
-            raw_output_text=response.output_text,
+            raw_output_text=raw_output_text,
         )
         normalized["saved_path"] = str(saved_path)
         normalized["model"] = self._model
@@ -138,6 +163,31 @@ class GPTPhysicalRuntime:
             "prompt": prompt,
             "annotation": normalized,
             "raw_output_text": raw_output_text,
+        }
+        target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return target
+
+    def write_failure_file(
+        self,
+        *,
+        image_path: str,
+        prompt: str,
+        error_type: str,
+        error_message: str,
+    ) -> Path:
+        image_file = Path(image_path)
+        self._output_dir.mkdir(parents=True, exist_ok=True)
+        digest = hashlib.sha1(str(image_file.resolve()).encode("utf-8")).hexdigest()[:12]
+        target = self._output_dir / f"{image_file.stem}_{digest}.error.json"
+        payload = {
+            "saved_at": datetime.now(timezone.utc).isoformat(),
+            "image_path": str(image_file.resolve()),
+            "image_name": image_file.name,
+            "prompt": prompt,
+            "error_type": error_type,
+            "error_message": error_message,
+            "model": self._model,
+            "base_url": self._base_url,
         }
         target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return target
@@ -246,7 +296,7 @@ class GPTPhysicalRuntime:
                 "如果图里主体更像变电站主设备、开关场、母线构架、主变压器区域，必须使用 substation_primary。",
                 "如果图里主体更像绝缘子串本体或绝缘子串近景，也统一归到 transmission_tower，不再单独作为主类别评分。",
                 "如果 prompt 中提供了 text_consistency_expected_classes，请优先在这些标准类名中判断主体归属。",
-                "只有真的无法归到这 6 类时才允许使用 unknown。",
+                "只有真的无法归到这 5 类时才允许使用 unknown。",
                 "必须严格按照下面分段打分，不能因为‘整体看起来不错’就打高分。",
                 "请重点检查以下规则：",
                 "wind_turbine: 叶片数量是否为3；叶片是否从机舱中心发出；塔身是否支撑机舱；塔身和叶片比例是否离谱；风机是否悬浮或插地异常。",

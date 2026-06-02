@@ -34,6 +34,14 @@ def build_scoring_service(
 ) -> ScoringService:
     """评分服务默认接入真实评分运行时，并复用同一个 CLIP-IQA 实例降低显存占用。"""
     runtime_settings = settings or get_settings()
+    physical_gpt_runtime = None
+    if runtime_settings.gpt_physical_enabled and runtime_settings.openai_api_key:
+        physical_gpt_runtime = GPTPhysicalRuntime(
+            output_dir=runtime_settings.output_image_check_dir / "physical_gpt_annotations",
+            api_key=runtime_settings.openai_api_key,
+            base_url=runtime_settings.openai_base_url,
+            model="gpt-5.4",
+        )
     return ScoringService(
         text_runtime=ImageRewardRuntime(),
         aesthetics_runtime=AestheticRuntime(),
@@ -43,9 +51,7 @@ def build_scoring_service(
                 "electric-score-v2": PowerScoreRuntime(
                     runtime_settings.scoring_model_dir / "electric-score-v2",
                     image_check_dir=runtime_settings.output_image_check_dir,
-                    physical_gpt_runtime=GPTPhysicalRuntime(
-                        output_dir=runtime_settings.output_image_check_dir / "physical_gpt_annotations",
-                    ),
+                    physical_gpt_runtime=physical_gpt_runtime,
                 ),
             }
         ),

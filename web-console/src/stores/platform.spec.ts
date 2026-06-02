@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   listAssetHistory: vi.fn(),
   listAssetHistoryPage: vi.fn(),
   listModels: vi.fn(),
+  listTaskPage: vi.fn(),
   listTasks: vi.fn(),
   getAssetDetail: vi.fn(),
   listTaskAuditEvents: vi.fn(),
@@ -419,6 +420,64 @@ describe('platform store', () => {
     expect(store.historyPageSize).toBe(20)
     expect(store.historyTotal).toBe(42)
     expect(store.historyTotalPages).toBe(3)
+  })
+
+  it('stores a task audit page from the backend pagination payload', async () => {
+    const { usePlatformStore } = await import('./platform')
+    const store = usePlatformStore()
+
+    api.listTaskPage.mockResolvedValue({
+      items: [
+        {
+          id: 2,
+          job_type: 'generate',
+          status: 'generating',
+          stage: 'generating',
+          error_message: '',
+          model_name: 'unipic2-kontext',
+          prompt: 'second',
+          negative_prompt: '',
+          payload_json: '{}',
+          created_at: '2026-04-19T18:02:00+08:00',
+          updated_at: '2026-04-19T18:10:00+08:00',
+        },
+      ],
+      page: 2,
+      page_size: 1,
+      total: 84,
+      total_pages: 84,
+    })
+
+    await store.fetchTaskAuditPage({ page: 2, page_size: 1 })
+
+    expect(api.listTaskPage).toHaveBeenCalledWith({
+      page: 2,
+      page_size: 1,
+    })
+    expect(store.taskAuditPageItems.map((task) => task.id)).toEqual([2])
+    expect(store.taskAuditPage).toBe(2)
+    expect(store.taskAuditPageSize).toBe(1)
+    expect(store.taskAuditTotal).toBe(84)
+    expect(store.taskAuditTotalPages).toBe(84)
+    expect(store.loadingTaskAuditPage).toBe(false)
+    expect(store.taskAuditPageLoadError).toBeNull()
+  })
+
+  it('keeps the task audit page empty and records the load error when task loading fails', async () => {
+    const { usePlatformStore } = await import('./platform')
+    const store = usePlatformStore()
+
+    api.listTaskPage.mockRejectedValue(new Error('network down'))
+
+    await expect(store.fetchTaskAuditPage({ page: 1, page_size: 10 })).rejects.toThrow('network down')
+
+    expect(store.taskAuditPageItems).toEqual([])
+    expect(store.taskAuditPage).toBe(1)
+    expect(store.taskAuditPageSize).toBe(10)
+    expect(store.taskAuditTotal).toBe(0)
+    expect(store.taskAuditTotalPages).toBe(0)
+    expect(store.loadingTaskAuditPage).toBe(false)
+    expect(store.taskAuditPageLoadError).toBe('network down')
   })
 
   it('keeps task audit as an empty array when the backend responds with null', async () => {

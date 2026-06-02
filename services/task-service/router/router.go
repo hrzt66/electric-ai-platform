@@ -21,6 +21,7 @@ func New(taskController *controller.TaskController) *gin.Engine {
 	tasks := v1.Group("/tasks")
 	tasks.POST("/generate", taskController.CreateGenerateJob)
 	tasks.GET("", taskController.ListJobs)
+	tasks.GET("/page", taskController.ListJobsPage)
 	tasks.GET("/:id", taskController.GetJob)
 
 	internal := engine.Group("/internal")

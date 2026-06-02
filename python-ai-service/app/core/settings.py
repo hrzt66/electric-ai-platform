@@ -83,14 +83,19 @@ class Settings:
     redis_url: str = "redis://localhost:6379/0"
     unipic2_offload_mode: str = DEFAULT_UNIPIC2_OFFLOAD_MODE
     scoring_release_after_batch: bool = True
+    gpt_physical_enabled: bool = True
     openai_api_key: str | None = None
-    openai_base_url: str = "https://geekspace.cloud/v1"
+    openai_base_url: str = "https://www.boxying.com/v1"
+    openai_image_api_key: str | None = None
+    openai_image_base_url: str = "https://www.boxying.com/v1"
     openai_image_model: str = "gpt-image-2"
 
     @classmethod
     def from_env(cls) -> "Settings":
         # 保持所有入口共享同一套变量命名，便于本机、Docker 和测试环境之间切换。
         _load_local_env_files()
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        openai_base_url = os.getenv("OPENAI_BASE_URL", "https://www.boxying.com/v1")
         return cls(
             runtime_root=_read_path_env("ELECTRIC_AI_RUNTIME_ROOT", DEFAULT_RUNTIME_ROOT),
             task_service_base_url=os.getenv("TASK_SERVICE_BASE_URL", "http://localhost:8083"),
@@ -104,8 +109,11 @@ class Settings:
                 allowed={"model", "sequential", "none"},
             ),
             scoring_release_after_batch=_read_bool_env("ELECTRIC_AI_SCORING_RELEASE_AFTER_BATCH", True),
-            openai_api_key=os.getenv("OPENAI_API_KEY"),
-            openai_base_url=os.getenv("OPENAI_BASE_URL", "https://geekspace.cloud/v1"),
+            gpt_physical_enabled=_read_bool_env("ELECTRIC_AI_GPT_PHYSICAL_ENABLED", True),
+            openai_api_key=openai_api_key,
+            openai_base_url=openai_base_url,
+            openai_image_api_key=os.getenv("OPENAI_IMAGE_API_KEY", openai_api_key),
+            openai_image_base_url=os.getenv("OPENAI_IMAGE_BASE_URL", openai_base_url),
             openai_image_model=os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2"),
         )
 

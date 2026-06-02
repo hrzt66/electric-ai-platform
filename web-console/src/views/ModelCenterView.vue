@@ -9,7 +9,18 @@ const platformStore = usePlatformStore()
 const modelPageLoading = ref(false)
 const modelPageError = ref('')
 
-const generationModels = computed(() => platformStore.models.filter((item) => item.model_type === 'generation'))
+const CURATED_GENERATION_MODEL_NAMES = new Set([
+  'sd15-electric',
+  'sd15-electric-specialized',
+  'ssd1b-electric',
+  'gpt-image-2',
+])
+
+const generationModels = computed(() =>
+  platformStore.models.filter(
+    (item) => item.model_type === 'generation' && CURATED_GENERATION_MODEL_NAMES.has(item.model_name),
+  ),
+)
 const scoringModels = computed(() => platformStore.models.filter((item) => item.model_type === 'scoring'))
 
 function jumpToGenerate(modelName: string) {
@@ -131,6 +142,7 @@ onMounted(() => {
   border-radius: 24px;
   padding: 24px;
   background: #ffffff;
+  border: 1px solid var(--ea-border);
   box-shadow: var(--ea-shadow);
 }
 
@@ -138,6 +150,7 @@ onMounted(() => {
 .model-card {
   border-radius: 24px;
   background: #ffffff;
+  border: 1px solid var(--ea-border);
   box-shadow: var(--ea-shadow);
 }
 
@@ -163,7 +176,7 @@ onMounted(() => {
 
 .hero-eyebrow,
 .model-type {
-  color: #8a5c18;
+  color: var(--ea-primary-strong);
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -171,7 +184,7 @@ onMounted(() => {
 
 .hero-title {
   margin-top: 6px;
-  color: #17202b;
+  color: var(--ea-text);
   font-size: 1.6rem;
 }
 
@@ -184,7 +197,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #17202b;
+  color: var(--ea-text);
 }
 
 .model-grid {
@@ -208,11 +221,11 @@ onMounted(() => {
 
 .model-card h3 {
   margin-top: 6px;
-  color: #17202b;
+  color: var(--ea-text);
 }
 
 .description {
-  color: #53606f;
+  color: var(--ea-text-muted);
   line-height: 1.6;
 }
 
@@ -226,16 +239,17 @@ onMounted(() => {
   gap: 4px;
   padding: 12px 14px;
   border-radius: 16px;
-  background: #f8fafc;
+  background: var(--ea-surface-alt);
+  border: 1px solid var(--ea-border);
 }
 
 .meta dt {
-  color: #64748b;
+  color: var(--ea-text-muted);
   font-size: 0.82rem;
 }
 
 .meta dd {
-  color: #17202b;
+  color: var(--ea-text);
   word-break: break-all;
 }
 

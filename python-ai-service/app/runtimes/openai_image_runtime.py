@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 from dataclasses import asdict
 from pathlib import Path
+from time import sleep
 from typing import Any, Callable
 from urllib.parse import urlparse
 
@@ -13,6 +14,11 @@ from httpx import Client as HttpxClient
 from app.runtimes.base import GeneratedImageRecord
 
 SUPPORTED_DALLE2_SIZES = {"256x256", "512x512", "1024x1024"}
+SUPPORTED_GPT_IMAGE_SIZES = {"1024x1024", "1536x1024", "1024x1536"}
+DEFAULT_GPT_IMAGE_SIZE = "1024x1024"
+TRANSIENT_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+DEFAULT_MAX_ATTEMPTS = 3
+DEFAULT_RETRY_DELAY_SECONDS = 1.0
 
 
 class OpenAIImageRuntime:
@@ -68,7 +74,7 @@ class OpenAIImageRuntime:
             request_kwargs["n"] = num_images
             request_kwargs["response_format"] = "url"
 
-        response = client.images.generate(**request_kwargs)
+        response = self._generate_with_retry(client=client, request_kwargs=request_kwargs)
         payloads = self._extract_payloads(response)
 
         saved: list[dict] = []
@@ -109,6 +115,32 @@ class OpenAIImageRuntime:
             max_retries=0,
         )
 
+    def _generate_with_retry(self, *, client: Any, request_kwargs: dict[str, Any]) -> Any:
+        last_error: Exception | None = None
+        for attempt in range(1, DEFAULT_MAX_ATTEMPTS + 1):
+            try:
+                return client.images.generate(**request_kwargs)
+            except Exception as exc:
+                if not self._is_transient_error(exc) or attempt >= DEFAULT_MAX_ATTEMPTS:
+                    raise
+                last_error = exc
+                sleep(DEFAULT_RETRY_DELAY_SECONDS * attempt)
+        assert last_error is not None
+        raise last_error
+
+    def _is_transient_error(self, exc: Exception) -> bool:
+        status_code = getattr(exc, "status_code", None)
+        if isinstance(status_code, int) and status_code in TRANSIENT_STATUS_CODES:
+            return True
+
+        response = getattr(exc, "response", None)
+        response_status = getattr(response, "status_code", None)
+        if isinstance(response_status, int) and response_status in TRANSIENT_STATUS_CODES:
+            return True
+
+        message = str(exc).lower()
+        return "no available compatible accounts" in message or "temporarily unavailable" in message
+
     def _validate_size(self, size: str) -> str:
         if self.image_model != "dall-e-2":
             return size
@@ -119,7 +151,10 @@ class OpenAIImageRuntime:
 
     def _resolve_size(self, *, width: int, height: int) -> str:
         if self.image_model.startswith("gpt-image-"):
-            return "auto"
+            requested_size = f"{width}x{height}"
+            if requested_size in SUPPORTED_GPT_IMAGE_SIZES:
+                return requested_size
+            return DEFAULT_GPT_IMAGE_SIZE
         return self._validate_size(f"{width}x{height}")
 
     def _extract_payloads(self, response: object) -> list[bytes]:

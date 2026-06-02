@@ -126,7 +126,7 @@ describe('HistoryDetailDrawer', () => {
     const html = await renderDrawer(createDetail())
 
     expect(html).toContain('grade-chip')
-    expect(html).toContain('>达标<')
+    expect(html).toContain('>较差<')
     expect(html).toContain('>偏低<')
     expect(html).toContain('51.27')
     expect(html.match(/grade-chip/g)?.length).toBe(5)

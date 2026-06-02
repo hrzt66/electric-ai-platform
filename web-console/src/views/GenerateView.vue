@@ -4,7 +4,6 @@ import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 
 import AuditTimeline from '../components/audit/AuditTimeline.vue'
-import GenerationProgressCard from '../components/workbench/GenerationProgressCard.vue'
 import ParameterPanel from '../components/workbench/ParameterPanel.vue'
 import ResultPreview from '../components/workbench/ResultPreview.vue'
 import ScoreRadar from '../components/workbench/ScoreRadar.vue'
@@ -12,6 +11,7 @@ import { localizeModelRecord } from '../model-copy'
 import { usePlatformStore } from '../stores/platform'
 import type { GenerateTaskRequest, ModelRecord, ScoreSummary } from '../types/platform'
 import { FRONTEND_DEFAULT_NEGATIVE_PROMPT, FRONTEND_DEFAULT_POSITIVE_PROMPT } from './generate-defaults'
+import { isTerminalTaskStatus, shouldResumeTaskPolling } from './generate-task-polling'
 import {
   pickRandomSystemPromptPreset,
 } from './generate-recommendations'
@@ -43,6 +43,13 @@ const FALLBACK_SCORING_MODELS: ModelRecord[] = [
   }),
 ]
 
+const CURATED_GENERATION_MODEL_NAMES = new Set([
+  'sd15-electric',
+  'sd15-electric-specialized',
+  'ssd1b-electric',
+  'gpt-image-2',
+])
+
 const route = useRoute()
 const platformStore = usePlatformStore()
 const activeIndex = ref(0)
@@ -66,7 +73,11 @@ const form = reactive<GenerateTaskRequest>({
 })
 
 const activeAsset = computed(() => platformStore.currentAssets[activeIndex.value] ?? null)
-const generationModels = computed(() => platformStore.models.filter((item) => item.model_type === 'generation'))
+const generationModels = computed(() =>
+  platformStore.models.filter(
+    (item) => item.model_type === 'generation' && CURATED_GENERATION_MODEL_NAMES.has(item.model_name),
+  ),
+)
 const availableGenerationModels = computed(() => generationModels.value.filter((item) => item.status === 'available'))
 const scoringModels = computed(() => {
   const catalog = platformStore.models.filter(
@@ -106,11 +117,13 @@ async function tickTask(taskId: number) {
   pollingInFlight.value = true
   try {
     const task = await platformStore.refreshTask(taskId)
-    if (task.status === 'completed') {
+    if (task.status === 'completed' || task.status === 'scored') {
       ElMessage.success(`任务 #${task.id} 已完成，评分结果已同步。`)
       stopPolling()
     } else if (task.status === 'failed') {
       ElMessage.error(task.error_message || `任务 #${task.id} 执行失败。`)
+      stopPolling()
+    } else if (isTerminalTaskStatus(task.status)) {
       stopPolling()
     }
   } catch (error) {
@@ -234,7 +247,7 @@ async function bootstrapWorkbench() {
     if (currentModel.value) {
       applyInitialPrompts(currentModel.value)
     }
-    if (platformStore.currentTaskId) {
+    if (shouldResumeTaskPolling(platformStore.currentTask)) {
       await startPolling(platformStore.currentTaskId)
     }
   } catch (error) {
@@ -280,7 +293,6 @@ onBeforeUnmount(() => {
           :task="platformStore.currentTask"
           @update:active-index="activeIndex = $event"
         />
-        <GenerationProgressCard :task="platformStore.currentTask" :audit-events="platformStore.currentTaskAudit" />
       </div>
 
       <div class="side-column">
@@ -329,7 +341,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .workbench {
   display: grid;
-  grid-template-columns: minmax(280px, 312px) minmax(0, 1fr) minmax(268px, 296px);
+  grid-template-columns: minmax(272px, 296px) minmax(0, 1.35fr) minmax(240px, 272px);
   gap: 16px;
   align-items: start;
 }
@@ -346,11 +358,27 @@ onBeforeUnmount(() => {
 }
 
 .preview-column {
-  display: grid;
-  gap: 16px;
-  grid-template-rows: auto auto;
-  align-content: start;
+  display: flex;
   min-height: 0;
+  align-self: stretch;
+}
+
+.preview-column :deep(.preview-card) {
+  flex: 1;
+  min-height: 100%;
+}
+
+.preview-column :deep(.image-stage) {
+  flex: 1;
+  min-height: 0;
+}
+
+.preview-column :deep(.image-frame) {
+  height: clamp(520px, calc(100vh - 300px), 860px);
+}
+
+.preview-column :deep(.preview-empty) {
+  min-height: clamp(520px, calc(100vh - 300px), 860px);
 }
 
 .side-column {
@@ -423,7 +451,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1450px) {
   .workbench {
-    grid-template-columns: minmax(280px, 304px) minmax(0, 1fr);
+    grid-template-columns: minmax(272px, 296px) minmax(0, 1fr);
   }
 
   .side-column {
@@ -442,8 +470,10 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .preview-column {
-    grid-template-rows: auto;
+  .preview-column :deep(.image-frame),
+  .preview-column :deep(.preview-empty) {
+    height: clamp(360px, 54vh, 620px);
+    min-height: clamp(320px, 54vh, 560px);
   }
 }
 </style>

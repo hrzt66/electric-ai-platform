@@ -379,6 +379,208 @@ powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1 -ModelNa
 - `REDIS_ADDR`
 - `JWT_SECRET`
 
+### macOS 本机部署
+
+仓库已经提供了 [scripts/mac/start-platform.sh](/Users/hrzt/code/vibe%20coding/codex/毕业设计/electric-ai-platform/scripts/mac/start-platform.sh) 与 [scripts/mac/stop-platform.sh](/Users/hrzt/code/vibe%20coding/codex/毕业设计/electric-ai-platform/scripts/mac/stop-platform.sh)，可以在 macOS 上直接拉起完整本机联调链路。
+
+这一套更适合：
+
+- 本地联调 Go / Python / Vue 三端
+- 论文展示、课程设计演示
+- Apple Silicon 或 Intel Mac 上做轻量验证
+
+不适合直接当作高负载生产部署方案，因为部分大模型在 macOS 上的速度、显存兼容性和驱动支持会弱于 Windows + NVIDIA 或 Docker + NVIDIA。
+
+#### macOS 部署前准备
+
+建议先确认以下依赖已经安装：
+
+1. `go`
+2. `node` 与 `npm`
+3. `python3` 或可用虚拟环境中的 `python`
+4. `uvicorn` 已安装到你实际要使用的 Python 解释器中
+5. `curl`
+6. `docker`，如果你希望脚本自动拉起 MySQL 和 Redis
+
+脚本对 Python 的查找顺序是：
+
+1. `./.venv/bin/python`
+2. `./python-ai-service/.venv/bin/python`
+3. `python`
+4. `python3`
+
+并且要求该解释器能成功执行 `-m uvicorn --version`。如果都不满足，脚本会直接退出。
+
+#### 第 1 步：准备 Python 依赖
+
+推荐在仓库根目录创建虚拟环境：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r python-ai-service/requirements.txt
+```
+
+如果你不想用根目录 `.venv`，也可以把环境建在 `python-ai-service/.venv`，脚本同样会自动识别。
+
+安装完成后，建议先验证：
+
+```bash
+./.venv/bin/python -m uvicorn --version
+```
+
+#### 第 2 步：安装前端依赖
+
+执行：
+
+```bash
+npm --prefix web-console install
+```
+
+如果之前已经安装过，可以跳过这一步。
+
+#### 第 3 步：准备 MySQL 和 Redis
+
+如果本机安装了 Docker，最简单的方式是直接执行：
+
+```bash
+./scripts/dev-up.sh
+```
+
+它会基于 `deploy/docker-compose.dependencies.yml` 拉起：
+
+- MySQL：`127.0.0.1:3307`
+- Redis：`127.0.0.1:6380`
+
+如果你没有 Docker，也可以自己提前启动本机 MySQL 和 Redis，只要监听端口与脚本默认值一致，或者你通过环境变量覆盖端口即可。
+
+默认连接参数如下：
+
+- `MYSQL_DSN=root:root@tcp(127.0.0.1:3307)/electric_ai?charset=utf8mb4&parseTime=True&loc=Local`
+- `REDIS_ADDR=127.0.0.1:6380`
+- `REDIS_URL=redis://127.0.0.1:6380/0`
+
+如果你想改端口，可以在启动前覆盖环境变量，例如：
+
+```bash
+MYSQL_PORT=13307 REDIS_PORT=16380 ./scripts/dev-up.sh
+```
+
+#### 第 4 步：启动整个平台
+
+执行：
+
+```bash
+./scripts/mac/start-platform.sh
+```
+
+这个脚本会按顺序完成以下动作：
+
+- 创建日志目录 `.runtime-logs/mac`
+- 解析运行时目录，默认使用 `repo/model`
+- 自动检查 Python 解释器
+- 如果系统存在 Docker，则调用 `./scripts/dev-up.sh` 启动 MySQL 和 Redis
+- 启动 `auth-service`、`model-service`、`task-service`、`asset-service`、`audit-service`、`monitor-service`
+- 启动 `gateway-service`
+- 启动 `python-ai-service` 的 API 进程
+- 启动 `python-worker`
+- 启动前端 `web-console`
+
+默认端口如下：
+
+- Gateway：`http://127.0.0.1:8080`
+- Auth Service：`http://127.0.0.1:8081`
+- Model Service：`http://127.0.0.1:8082`
+- Task Service：`http://127.0.0.1:8083`
+- Asset Service：`http://127.0.0.1:8084`
+- Audit Service：`http://127.0.0.1:8085`
+- Monitor Service：`http://127.0.0.1:8086`
+- Python API：`http://127.0.0.1:8090`
+- Web Console：`http://127.0.0.1:5173`
+
+默认运行时目录是仓库下的 `model/`，也就是：
+
+- 生成模型：`model/generation/...`
+- 评分模型：`model/scoring/...`
+- 生成图片：`model/image`
+- 检查图片：`model/image_check`
+- Hugging Face 缓存：`model/hf-home`
+
+如果你想把运行时根目录改到别的位置，可以这样启动：
+
+```bash
+ELECTRIC_AI_RUNTIME_ROOT=/absolute/path/to/runtime ./scripts/mac/start-platform.sh
+```
+
+如果只想启动后端和 Python，不启动前端：
+
+```bash
+./scripts/mac/start-platform.sh --skip-web
+```
+
+#### 第 5 步：验证启动结果
+
+启动完成后，至少检查以下地址：
+
+```bash
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8086/health
+curl http://127.0.0.1:8090/health
+```
+
+然后在浏览器打开：
+
+- `http://127.0.0.1:5173`
+
+如果你只想确认前端和网关是否联通，也可以手工检查：
+
+- 登录接口：`POST /api/v1/auth/login`
+- 模型列表：`GET /api/v1/models`
+- 任务列表：`GET /api/v1/tasks`
+
+#### 第 6 步：查看日志
+
+macOS 本机启动日志默认写到：
+
+- `.runtime-logs/mac/auth-service.stdout.log`
+- `.runtime-logs/mac/auth-service.stderr.log`
+- `.runtime-logs/mac/model-service.stdout.log`
+- `.runtime-logs/mac/task-service.stdout.log`
+- `.runtime-logs/mac/python-api.stdout.log`
+- `.runtime-logs/mac/python-worker.stdout.log`
+- `.runtime-logs/mac/web-console.stdout.log`
+
+每个服务还会生成对应的 `*.pid` 文件，供停止脚本回收。
+
+#### 第 7 步：停止平台
+
+停止平台进程：
+
+```bash
+./scripts/mac/stop-platform.sh
+```
+
+如果你希望连同 MySQL 和 Redis 依赖一起停掉：
+
+```bash
+./scripts/mac/stop-platform.sh --with-deps
+```
+
+这个脚本会优先根据 `.runtime-logs/mac/*.pid` 停止已管理进程；如果 pid 文件不存在，也会继续尝试按监听端口回收：
+
+- `8080` 到 `8086`
+- `8090`
+- `5173`
+
+#### macOS 部署注意事项
+
+- `scripts/mac/start-platform.sh` 不会帮你自动安装 Python 依赖或 `npm` 依赖，这两步需要你提前完成。
+- 如果系统没有 Docker，脚本不会自动创建 MySQL 和 Redis，只会检查 `3307` 与 `6380` 是否已经有监听。
+- 脚本默认将 `IMAGE_OUTPUT_DIR` 指向 `$ELECTRIC_AI_RUNTIME_ROOT/image`，因此 macOS 路线下生成图片优先落在 `model/image` 或你自定义的运行时目录下。
+- 如果你把 `ELECTRIC_AI_RUNTIME_ROOT` 改到新目录，记得同步准备 `generation`、`scoring`、`hf-home` 等子目录内容，否则模型探针和真实生成会失败。
+- 如果 Apple GPU 或本机内存不足，部分生成或评分模型可能无法正常加载；这类问题优先检查 Python API 日志和 Worker 日志。
+
 ### macOS / Linux 本地依赖
 
 如果你只是想在 Docker 里准备本地开发所需的 MySQL 和 Redis，可以直接执行：

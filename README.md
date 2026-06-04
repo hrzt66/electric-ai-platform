@@ -58,6 +58,8 @@ powershell -ExecutionPolicy Bypass -File scripts/docker/download-models.ps1 -Mod
 powershell -ExecutionPolicy Bypass -File scripts/docker/smoke-test.ps1 -ModelName unipic2-kontext
 ```
 
+如果你需要完整部署说明，而不只是命令清单，请直接看下文的“详细部署步骤”。
+
 ## 架构速览
 
 ```mermaid
@@ -200,7 +202,34 @@ electric-ai-platform
 - MySQL：`127.0.0.1:13307`
 - Redis：`127.0.0.1:16380`
 
-## Windows 原生运行
+## 详细部署步骤
+
+这一节按真实脚本行为整理，适合第一次部署或写毕业设计交付文档时直接照着执行。
+
+### 方案选择
+
+- 需要完整平台并优先使用本机 GPU：走“Windows 原生部署”。
+- 需要用容器统一拉起整个平台：走“Docker 全量部署”。
+- 只想给本地 Go / Python 服务准备 MySQL 和 Redis：走“仅启动开发依赖”。
+
+### 部署前准备
+
+无论采用哪种方式，建议先确认以下条件：
+
+1. 已克隆仓库，并在仓库根目录执行命令。
+2. Windows 路线下，`G:\Golang\go1.24.0\bin\go.exe`、`G:\miniconda3\condabin\conda.bat`、`npm.cmd` 可正常使用。
+3. Docker 路线下，Docker Desktop 已启动，且宿主机具备可用 NVIDIA GPU 环境。
+4. 已准备 AI 运行时目录 `G:\electric-ai-runtime`，用于存放模型、缓存、日志和生成结果。
+5. 默认端口未被其他无关进程占用：`3307`、`6380`、`8080-8086`、`8090`、`5173`、`13307`、`16380`、`18080`、`18088`、`18090`。
+
+### Windows 原生部署
+
+这是当前仓库最完整、最贴近开发联调的运行方式。启动脚本会：
+
+- 复用或拉起 MySQL / Redis
+- 构建并启动全部 Go 微服务
+- 启动 Python API 与 Worker
+- 启动前端 Vite 开发服务器
 
 推荐依次执行以下命令：
 
@@ -209,6 +238,111 @@ powershell -ExecutionPolicy Bypass -File scripts/windows/setup-python-runtime.ps
 powershell -ExecutionPolicy Bypass -File scripts/windows/download-runtime-models.ps1 -All
 powershell -ExecutionPolicy Bypass -File scripts/windows/start-platform.ps1
 powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1
+```
+
+#### 第 1 步：初始化 Python 运行时
+
+执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/setup-python-runtime.ps1
+```
+
+这个脚本会自动完成：
+
+- 创建或复用 `G:\miniconda3\envs\electric-ai-py310`
+- 安装 [python-ai-service/requirements.txt](/Users/hrzt/code/vibe%20coding/codex/毕业设计/electric-ai-platform/python-ai-service/requirements.txt) 中的依赖
+- 执行 `python-ai-service/scripts/runtime_probe.py`，确认 Python AI 服务的基础运行环境可用
+
+如果你的 Conda 不在默认位置，可以显式传参：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/setup-python-runtime.ps1 `
+  -CondaBat 'D:\miniconda3\condabin\conda.bat' `
+  -PythonEnvPath 'D:\miniconda3\envs\electric-ai-py310' `
+  -RuntimeRoot 'D:\electric-ai-runtime'
+```
+
+#### 第 2 步：准备模型目录和运行时资源
+
+执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/download-runtime-models.ps1 -All
+```
+
+这个脚本会把 `ELECTRIC_AI_RUNTIME_ROOT` 指向 `G:\electric-ai-runtime`，然后调用 Python CLI 检查或准备模型目录。若只想检查目录是否完整，可使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/download-runtime-models.ps1 -CheckOnly -All
+```
+
+若只准备指定模型，可使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/download-runtime-models.ps1 -Model sd15-electric,unipic2-kontext
+```
+
+#### 第 3 步：启动平台
+
+执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/start-platform.ps1
+```
+
+脚本默认行为如下：
+
+- MySQL 端口：`3307`
+- Redis 端口：`6380`
+- Gateway：`http://127.0.0.1:8080`
+- Python API：`http://127.0.0.1:8090`
+- Web Console：`http://127.0.0.1:5173`
+
+启动时会自动做这些检查和处理：
+
+- 如果 `3307` 与 `6380` 无监听，则调用 [scripts/dev-up.ps1](/Users/hrzt/code/vibe%20coding/codex/毕业设计/electric-ai-platform/scripts/dev-up.ps1) 拉起开发依赖
+- 检查运行时模型目录是否可用
+- 清理仓库自身残留的旧进程和旧监听端口
+- 构建并启动 `auth-service`、`model-service`、`task-service`、`asset-service`、`audit-service`、`monitor-service`、`gateway-service`
+- 启动 `python-ai-service` 的 API 进程与 Worker 进程
+- 如果未指定 `-SkipWeb`，启动前端开发服务器
+
+如果你只想启动后端与 Python，不启动前端，可用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/start-platform.ps1 -SkipWeb
+```
+
+如果你已经提前准备好了 Python 环境，也可以跳过 Python 初始化：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/start-platform.ps1 -SkipPythonSetup
+```
+
+启动完成后，日志默认在 `.runtime-logs/windows/` 下。
+
+#### 第 4 步：执行冒烟验证
+
+执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1
+```
+
+这个脚本会实际完成一条端到端链路：
+
+1. 检查 `gateway` 与 `python runtime` 健康状态。
+2. 调用 `/api/v1/auth/login` 使用默认账户登录。
+3. 拉取模型列表，确认目标模型已暴露。
+4. 创建一条真实生成任务。
+5. 轮询任务状态直到 `completed`。
+6. 校验资产历史、图片文件、评分结果和审计事件。
+
+默认测试模型是 `sd15-electric`。如需切换：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1 -ModelName unipic2-kontext
 ```
 
 ### 各脚本职责
@@ -221,6 +355,12 @@ powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1
   拉起 MySQL / Redis、全部 Go 微服务、Python API、Python Worker 与前端开发服务器。
 - `scripts/windows/smoke-test.ps1`
   执行真实登录、真实生成任务、状态轮询、资产校验与审计校验。
+
+### Windows 原生停止方式
+
+- 停止 MySQL 和 Redis：`powershell -ExecutionPolicy Bypass -File scripts/dev-down.ps1`
+- 其余平台进程会在下次执行 `scripts/windows/start-platform.ps1` 时被自动清理；如需立刻停止，可结束 `.runtime-logs/windows/launchers` 拉起的对应进程
+- 若只需停止 macOS/Linux 版本的本地平台脚本，可参考 [scripts/mac/stop-platform.sh](/Users/hrzt/code/vibe%20coding/codex/毕业设计/electric-ai-platform/scripts/mac/stop-platform.sh)
 
 ### GoLand 本地调试
 
@@ -270,9 +410,16 @@ powershell -ExecutionPolicy Bypass -File scripts/windows/smoke-test.ps1
 MYSQL_PORT=13307 REDIS_PORT=16380 ./scripts/dev-up.sh
 ```
 
-## Docker 运行
+### Docker 全量部署
 
-Docker 路线使用完整编排文件 `deploy/docker-compose.platform.yml`，不会覆盖当前 Windows 原生链路。
+Docker 路线使用完整编排文件 [deploy/docker-compose.platform.yml](/Users/hrzt/code/vibe%20coding/codex/毕业设计/electric-ai-platform/deploy/docker-compose.platform.yml)，会同时启动：
+
+- `mysql`
+- `redis`
+- 全部 Go 微服务
+- `python-ai-service`
+- `python-ai-worker`
+- `web-console`
 
 推荐顺序：
 
@@ -282,17 +429,124 @@ powershell -ExecutionPolicy Bypass -File scripts/docker/download-models.ps1 -Mod
 powershell -ExecutionPolicy Bypass -File scripts/docker/smoke-test.ps1 -ModelName unipic2-kontext
 ```
 
-停止平台：
+#### 第 1 步：拉起容器平台
+
+执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker/up-platform.ps1
+```
+
+默认会执行 `docker compose -f deploy/docker-compose.platform.yml up -d --build`，并等待以下地址可访问：
+
+- `http://127.0.0.1:18080/health`
+- `http://127.0.0.1:18090/health`
+- `http://127.0.0.1:18088`
+
+如果你已经构建过镜像，只想直接启动容器：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker/up-platform.ps1 -NoBuild
+```
+
+#### 第 2 步：下载或检查容器运行时模型
+
+执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker/download-models.ps1 -All
+```
+
+这个脚本本质上会执行容器内命令：
+
+```powershell
+docker compose -f deploy/docker-compose.platform.yml run --rm python-ai-service python3 scripts/download_models.py --all
+```
+
+如果只检查不下载：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker/download-models.ps1 -CheckOnly -All
+```
+
+如果只处理指定模型：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker/download-models.ps1 -Model sd15-electric -Model unipic2-kontext
+```
+
+#### 第 3 步：执行 Docker 冒烟测试
+
+执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker/smoke-test.ps1 -ModelName unipic2-kontext
+```
+
+这个脚本会在 Docker 暴露端口上完成与 Windows 原生相同的端到端验证，默认地址如下：
+
+- Gateway：`http://127.0.0.1:18080`
+- Python API：`http://127.0.0.1:18090`
+- Web Console：`http://127.0.0.1:18088`
+
+#### 第 4 步：停止容器平台
+
+执行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/docker/down-platform.ps1
 ```
 
-### Docker 运行前注意
+如果需要连同数据卷一起清理：
 
-- 需要设置 `JWT_SECRET`，否则容器中的 Go 服务会在启动时报 `missing required env var: JWT_SECRET`。
-- Docker 会把 `G:\electric-ai-runtime` 挂载到容器内 `/runtime`，因此模型和输出会与本机原生共享。
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker/down-platform.ps1 -RemoveVolumes
+```
+
+### Docker 部署注意事项
+
+- `deploy/docker-compose.platform.yml` 已经内置 `JWT_SECRET: electric-ai-secret`，按仓库默认脚本运行时不需要额外手工设置。
+- Docker 会把宿主机 `G:/electric-ai-runtime` 挂载到容器内 `/runtime`，因此模型、缓存和输出会与 Windows 原生共享。
 - 如果第一次构建时间较长，属于正常现象，尤其是 Python AI 镜像与前端依赖安装阶段。
+- `python-ai-service` 与 `python-ai-worker` 都声明了 GPU 资源保留；如果 Docker Desktop 没有正确接入 NVIDIA 运行时，容器可能启动成功但模型不可用。
+- Compose 中网关容器的 `IMAGE_OUTPUT_DIR` 当前配置为 `/runtime/image`，而 Python 运行时输出目录说明使用的是 `/runtime/outputs` 体系；如果你调整了容器内静态文件映射，建议同步核对图片预览链路。
+
+### 仅启动开发依赖
+
+如果你不需要整个平台，只想在本机启动 Go 服务或 Python 服务，并把数据库和 Redis 交给 Docker 管理，可以使用依赖编排：
+
+- Windows：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/dev-up.ps1
+```
+
+- macOS / Linux：
+
+```bash
+./scripts/dev-up.sh
+```
+
+默认会启动：
+
+- MySQL：`127.0.0.1:3307`
+- Redis：`127.0.0.1:6380`
+
+停止方式：
+
+- Windows：`powershell -ExecutionPolicy Bypass -File scripts/dev-down.ps1`
+- macOS / Linux：`./scripts/dev-down.sh`
+
+### 部署完成后的检查清单
+
+无论选择哪种部署方式，建议至少检查以下项目：
+
+1. `gateway` 健康接口可访问。
+2. `python-ai-service` 健康接口可访问。
+3. 模型探针接口能看到目标模型，状态为 `available` 或 `experimental`。
+4. 默认账户 `admin / admin123456` 可以登录。
+5. 能成功提交一条生成任务，并在历史中心看到图片与评分。
+6. 审计页能看到完整阶段事件。
 
 ## 模型说明
 

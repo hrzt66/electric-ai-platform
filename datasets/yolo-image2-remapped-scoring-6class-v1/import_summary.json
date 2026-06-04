@@ -1,0 +1,25 @@
+{
+  "source_yaml": "/Users/hrzt/code/vibe coding/codex/毕业设计/image-2/final_best_hqv2_hardcleanr2_yolo11s/dataset.yaml",
+  "source_root": "/Users/hrzt/code/vibe coding/codex/毕业设计/image-2/datasets/highquality-v2-pure-yolo-clean-r1-windgood1x-towerclean8-hardclean-r2",
+  "target_root": "datasets/yolo-image2-remapped-scoring-6class-v1",
+  "source_tag": "final_best_hqv2_hardcleanr2_yolo11s",
+  "target_classes": [
+    "substation_primary",
+    "transmission_tower",
+    "insulator_string",
+    "wind_turbine",
+    "solar_panel",
+    "dam"
+  ],
+  "copied_images": 351,
+  "dropped_images": 73,
+  "kept_boxes": 689,
+  "dropped_boxes": 86,
+  "mapped_counts_by_target": {
+    "dam": 88,
+    "solar_panel": 108,
+    "substation_primary": 44,
+    "transmission_tower": 137,
+    "wind_turbine": 312
+  }
+}

@@ -13,7 +13,6 @@ web-console/node_modules/
 web-console/dist/
 .runtime-logs/
 .runtime-bin/
-datasets/
 model/
 runs/
 *.pt

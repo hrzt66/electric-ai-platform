@@ -1,0 +1,11 @@
+path: datasets/yolo-image2-remapped-scoring-6class-v1
+train: images/train
+val: images/val
+test: images/test
+names:
+  - substation_primary
+  - transmission_tower
+  - insulator_string
+  - wind_turbine
+  - solar_panel
+  - dam
